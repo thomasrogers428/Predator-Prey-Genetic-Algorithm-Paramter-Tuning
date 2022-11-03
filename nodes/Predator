@@ -13,15 +13,16 @@ from turtlesim.msg import Pose
 from ppgapt.msg import Registration
 
 # Constants.
+DEFAULT_PREDATOR_LINEAR_VELOCITY = 10 # m/s
 FREQUENCY = 10
+MAX_DIST = 1000
 
 class Predator():
     def __init__(self):
         """Constructor."""
         self.namespace = rospy.get_namespace()
 
-        self.prey = {}
-        self.locs = []
+        self.preys = {}
 
         # pub/subs
         self._cmd_pub = rospy.Publisher(self.namespace + "cmd_vel", Twist, queue_size=1)
@@ -29,22 +30,52 @@ class Predator():
         # create service for registration
         self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
 
-        # init listener
-        self.listener = tf.TransformListener()
+        self._odom_sub = rospy.Subscriber(self.namespace + "/odom", Twist, self.odom_callback)
+
+        # # init listener
+        # self.listener = tf.TransformListener()
 
         # vel values
         self.linear_velocity = 2 # m/s
         self.angular_velocity = math.pi/4 # rad/s
 
-    def registration_callback(self, msg):
-        self.prey[msg.robotname.data] = (None,None)
-        rospy.Subscriber(msg.robotname.data + "/odom", Twist, self.location_callback, msg.robotname.data)
+        self.x, self.y = None, None
 
-    def location_callback(self, msg):
-        pass
+    def registration_callback(self, msg):
+        self.preys[msg.robotname.data] = (None,None)
+        rospy.Subscriber(msg.robotname.data + "/odom", Twist, self.location_callback, (msg.robotname.data))
+
+    def location_callback(self, msg, args):
+        self.preys[args[0]] = (msg.pose.pose.x, msg.pose.pose.y)
+
+    def odom_callback(self, msg):
+        self.x, self.y, self.theta = msg.pose.pose.x, msg.pose.pose.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
+
+    def find_target_prey(self):
+        min_dist = MAX_DIST
+        target = None
+        for prey in self.preys:
+            dist_to_prey = math.sqrt((self.x - prey[0])**2 + (self.y - prey[1]**2))
+            if dist_to_prey < min_dist:
+                min_dist = dist_to_prey
+                target = prey
+
+        return target 
 
     def run(self):
-        pass
+        while True:
+            target = self.find_target_prey()
+            target_x, target_y = self.preys[target]
+
+            tan_angle = math.atan2(target_y - self.y, target_x - self.x)
+
+            angle = tan_angle - self.theta
+
+            twist_msg = Twist()
+            twist_msg.angular.z = angle
+            twist_msg.linear.x = DEFAULT_PREDATOR_LINEAR_VELOCITY
+            self._cmd_pub.publish(twist_msg)
+
 
     
 def main():
