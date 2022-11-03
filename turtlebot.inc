@@ -22,8 +22,6 @@ define turtlebot position
   gui_nose 1
   drive "diff"
   color "gray"
-
-  localization "odom"
   
   kinect(pose [ -0.1 0.0 -0.11 0.0 ])
 )

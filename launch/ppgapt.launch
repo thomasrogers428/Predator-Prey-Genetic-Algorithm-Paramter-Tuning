@@ -1,0 +1,24 @@
+<launch>
+
+  <arg name="use_sim_time" default="true"/>
+  <param name="use_sim_time" value="$(arg use_sim_time)"/>
+
+  <param name="robot_0" value="robot_0"/>
+  <param name="robot_1" value="robot_1"/>
+  <param name="robot_2" value="robot_2"/>
+
+  <param name="num_robots" value="3"/>
+
+  <group ns="robot_0">
+    <node pkg="ppgapt" type="predator" name="predator" output="screen"/>
+  </group>
+
+  <group ns="robot_1">
+    <node pkg="ppgapt" type="prey" name="prey" output="screen"/>
+  </group>
+
+  <group ns="robot_2">
+    <node pkg="ppgapt" type="prey" name="prey" output="screen"/>
+  </group>
+
+</launch>

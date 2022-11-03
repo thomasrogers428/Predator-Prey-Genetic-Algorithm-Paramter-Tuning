@@ -30,6 +30,7 @@ catkin_python_setup()
 add_message_files(
   DIRECTORY msg
   FILES
+  Registration.msg
 )
 
 
@@ -66,9 +67,8 @@ include_directories(
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
 
 catkin_install_python(PROGRAMS 
-  nodes/auctioneer
-  nodes/bidder
-  nodes/publisher
+  nodes/prey
+  nodes/predator
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
