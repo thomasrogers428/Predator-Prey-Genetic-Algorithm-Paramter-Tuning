@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+
+import math
+
+# import of relevant libraries.
+import rospy # module for ROS APIs
+import tf
+
+# import msg/action/srv
+from geometry_msgs.msg import Twist # message type for cmd_vel
+from turtlesim.msg import Pose
+
+from ppgapt.msg import Registration
+
+
+class Prey():
+    def __init__(self):
+        self.namespace = rospy.get_namespace()
+
+        self._registration_pub = rospy.Publisher("registration", Registration, queue_size=1)
+
+
+    def run(self):
+
+        registration_msg = Registration()
+        registration_msg.robotname = self.namespace
+        self._registration_pub.publish(registration_msg)
+
+        

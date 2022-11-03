@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+
+import math
+
+# import of relevant libraries.
+import rospy # module for ROS APIs
+import tf
+
+# import msg/action/srv
+from geometry_msgs.msg import Twist # message type for cmd_vel
+from turtlesim.msg import Pose
+
+from ppgapt.msg import Registration
+
+# Constants.
+FREQUENCY = 10
+
+class Predator():
+    def __init__(self):
+        """Constructor."""
+        self.namespace = rospy.get_namespace()
+
+        self.prey = {}
+        self.locs = []
+
+        # pub/subs
+        self._cmd_pub = rospy.Publisher(self.namespace + "cmd_vel", Twist, queue_size=1)
+
+        # create service for registration
+        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+
+        # init listener
+        self.listener = tf.TransformListener()
+
+        # vel values
+        self.linear_velocity = 2 # m/s
+        self.angular_velocity = math.pi/4 # rad/s
+
+    def registration_callback(self, msg):
+        self.prey[msg.robotname.data] = (None,None)
+        rospy.Subscriber(msg.robotname.data + "/odom", Twist, self.location_callback, msg.robotname.data)
+
+    def location_callback(self, msg):
+        pass
+
+    def run(self):
+        pass
+
+    
+def main():
+    """Main function."""
+
+    # 1st. initialization of node.s
+    rospy.init_node('predator')
+
+    # Sleep for a few seconds to wait for the registration.
+    rospy.sleep(2)
+
+    # Initialization of the class for the Leader.
+    predator = Predator()
+    predator.run()
+
+
+if __name__ == "__main__":
+    """Run the main function."""
+    main()
