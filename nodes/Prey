@@ -26,8 +26,9 @@ MIN_THRESHOLD_DISTANCE = 0.8 # m, threshold distance.
 class Prey():
     def __init__(self, linear_velocity=LINEAR_VELOCITY, angular_velocity=ANGULAR_VELOCITY):
 
-        self.angular_velocity = ANGULAR_VELOCITY
-        self.linear_velocity = LINEAR_VELOCITY
+        velocities = self.generate_velocities()
+        self.angular_velocity = velocities[0]
+        self.linear_velocity = velocities[1]
         self.namespace = rospy.get_namespace()
         self._close_obstacle = None
 
@@ -117,7 +118,7 @@ class Prey():
         # Traveled the required distance, stop.
         self.stop()
 
-        
+
 
     def stop(self):
         """Stop the robot."""
