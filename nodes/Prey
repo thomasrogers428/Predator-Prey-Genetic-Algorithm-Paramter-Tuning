@@ -14,6 +14,9 @@ from turtlesim.msg import Pose
 
 from ppgapt.msg import Registration
 
+LASER_ANGLE_FRONT = 0 # radians
+MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
+
 
 # Constants
 FREQUENCY = 10 #Hz.
@@ -141,13 +144,23 @@ class Prey():
 
         # Traveled the required distance, stop.
         self.stop()
-
+        
+    def _laser_callback(self, msg):
+        """Processing of laser message."""
+        # Access to the index of the measurement in front of the robot.
+        # NOTE: assumption: the one at angle 0 corresponds to the front.
+        i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
+        if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
+            self._close_obstacle = True
+        else:
+            self._close_obstacle = False
 
 
     def stop(self):
         """Stop the robot."""
         twist_msg = Twist()
         self._cmd_pub.publish(twist_msg)
+
 
 
 def main():
@@ -186,5 +199,6 @@ def main():
 if __name__ == "__main__":
     """Run the main function."""
     main()
+
 
         
