@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- Full information here http://wiki.ros.org/catkin/package.xml -->
 <package format="2">
-  <name>simple_motion</name>
+  <name>ppgapt</name>
   <version>0.1.0</version>
   <description>
     ROS package for moving the robot forward for a given distance and rotate.
@@ -11,4 +11,11 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>rospy</depend>
   <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>actionlib_msgs</depend>
+  <depend>turtlesim</depend>
+
+  <build_depend>message_generation</build_depend>
+
+  <exec_depend>message_runtime</exec_depend>
 </package>
