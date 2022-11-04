@@ -5,6 +5,7 @@ import math
 # import of relevant libraries.
 import rospy # module for ROS APIs
 import tf
+import random
 
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
@@ -42,10 +43,10 @@ class Prey():
         self._close_obstacle = None
 
         # Set up publishers
-        cmd_vel_topic = self.name + "/cmd_vel"
+        cmd_vel_topic = self.namespace + "cmd_vel"
         self._cmd_pub = rospy.Publisher(cmd_vel_topic, Twist, queue_size=1)
         
-        odom_topic = self.namespace + "/odom"
+        odom_topic = self.namespace + "odom"
         self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
 
         # Register prey robot with predators
@@ -99,7 +100,7 @@ class Prey():
         
         duration = rotation_angle / twist_msg.angular.z
         start_time = rospy.get_rostime()
-        rate = rospy.Rate(self.freq)
+        rate = rospy.Rate(FREQUENCY)
         while not rospy.is_shutdown():
             # Check if done
             if rospy.get_rostime() - start_time >= rospy.Duration(duration):

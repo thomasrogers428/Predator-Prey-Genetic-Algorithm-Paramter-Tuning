@@ -9,6 +9,7 @@ import tf
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
 from turtlesim.msg import Pose
+from nav_msgs.msg import Odometry # message type for odom
 
 from ppgapt.msg import Registration
 
@@ -30,7 +31,7 @@ class Predator():
         # create service for registration
         self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
 
-        self._odom_sub = rospy.Subscriber(self.namespace + "odom", Twist, self.odom_callback)
+        self._odom_sub = rospy.Subscriber(self.namespace + "odom", Odometry, self.odom_callback)
 
         # # init listener
         # self.listener = tf.TransformListener()
@@ -43,7 +44,7 @@ class Predator():
 
     def registration_callback(self, msg):
         self.preys[msg.robotname.data] = (None,None)
-        rospy.Subscriber(msg.robotname.data + "/odom", Twist, self.location_callback, (msg.robotname.data))
+        rospy.Subscriber(msg.robotname.data + "/odom", Odometry, self.location_callback, (msg.robotname.data))
 
     def location_callback(self, msg, args):
         self.preys[args[0]] = (msg.pose.pose.x, msg.pose.pose.y)
@@ -52,6 +53,8 @@ class Predator():
         self.x, self.y, self.theta = msg.pose.pose.x, msg.pose.pose.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
 
     def find_target_prey(self):
+        while not self.preys:
+            continue
         min_dist = MAX_DIST
         target = None
         for prey in self.preys:
