@@ -13,9 +13,9 @@ from sensor_msgs.msg import LaserScan # message type for scan
 from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
 
-from ppgapt.msg import Registration
+from ppgapt.msg import Registration_msg
 from ppgapt.msg import Alive_msg
-from ppgapt.msg import Kill
+from ppgapt.msg import Kill_msg
 
 
 LASER_ANGLE_FRONT = 0 # radians
@@ -66,8 +66,8 @@ class Prey():
         self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
 
         # Register prey robot with predators
-        self._registration_pub = rospy.Publisher(DEFAULT_REGISTRATION_TOPIC, Registration, queue_size=1)
-        registration_msg = Registration()
+        self._registration_pub = rospy.Publisher(DEFAULT_REGISTRATION_TOPIC, Registration_msg, queue_size=1)
+        registration_msg = Registration_msg()
         registration_msg.robotname = self.namespace
         self._registration_pub.publish(registration_msg)
         
@@ -75,7 +75,7 @@ class Prey():
         self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
         self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
         self._odom_sub = rospy.Subscriber(odom_topic, Odometry, self._odom_callback, queue_size=1)
-        self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill, self._kill_callback, queue_size=1)
+        self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill_msg, self._kill_callback, queue_size=1)
 
     # method to avoid predators using separation
     def evade(self):
