@@ -5,6 +5,7 @@ import math
 # import of relevant libraries.
 import rospy # module for ROS APIs
 import tf
+from random import random
 
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
@@ -14,203 +15,167 @@ from turtlesim.msg import Pose
 from Prey import Prey
 
 from ppgapt.msg import Registration
-from ppgapt.msg import Alive_msg
+from ppgapt.msg import kill_msg
+from ppgapt.msg import alive_msg
+from ppgapt.msg import new_gen_msg
+from ppgapt.msg import ready_msg
+
 
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 # Constants
-FIRST_GEN_BOTS = 10 # Number of prey bots in the first generation
+NUM_PREY_BOTS = 10 # Number of prey bots
+NUM_PREDATOR_BOTS = 2 # Number of predator bots
 KILLED_THRESHOLD = 4 # Once 4 bots are killed, a new generation is spawned
-
 
 
 class Master():
     def __init__(self):
 
-        self.first_gen = FIRST_GEN_BOTS
+        self.num_prey_bots = NUM_PREY_BOTS
+        self.num_predator_bots = NUM_PREDATOR_BOTS
         self.num_killed = 0
         self.num_killed_threshold = KILLED_THRESHOLD
         self.generation_count = 0
 
-        self.preys = []
-        self.spawn_first_gen()
+        self.ready = False
+        self.num_ready = 0
+
+        self.prey = []
+        self.alive = {}
+        self.dead = []
+
+        # Custom message publisher
+        self._alive_pub = rospy.Publisher("alive", alive_msg, queue_size=1)
+        self._new_gen_pub = rospy.Publisher("new_gen", new_gen_msg, queue_size=1)
 
         # Set up subscribers
-
         # create service for registration
         self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+        self._ready_sub = rospy.Subscriber("ready", ready_msg, self.ready_callback)
 
         # create kill message subscriber
         self._kill_sub = rospy.Subscriber("kill", Kill, self.kill_callback)
 
 
-    # Callback function which adds prey to prey list
-    def registration_callback(self, msg):
-        self.preys.append(msg.robotname.data)
-
-
-    # Callback function for when a robot is killed
-    def kill_callback(self, msg):
-        return
-
-
-    # A function to spawn the first generation of robots
+    # A function to spawn the first generation of predator and prey robots
     def spawn_first_gen(self):
 
-        for i in range(0, self.first_gen):
-            name = "robot_" + str(i)
-            # Generate random parameters 
-            prey_x = Prey()
-
-    
-    
-
-
-        # create service for registration
-        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
-
-        # create kill message subscriber
-        self._kill_sub = rospy.Subscriber("kill", Kill, self.kill_callback)
-
-
-    # Callback function which adds prey to prey list
-    def registration_callback(self, msg):
-        self.preys.append(msg.robotname.data)
-
-
-    # Callback function for when a robot is killed
-    def kill_callback(self, msg):
-        return
-
-
-    # A function to spawn the first generation of robots
-    def spawn_first_gen(self):
-
-        for i in range(0, self.first_gen):
-            name = "robot_" + str(i)
-            # Generate random parameters 
-            prey_x = Prey()
-
-    
-    
-
-
-    
-
-
-
-
-
-
-    # A function to randomly generate linked traits 
-    def genetic_velocities(self):
-
-        speed_percentage = random.uniform(0, 1)
-        speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
-
-        angular_percentage = 1 - speed_percentage
-        angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
-
-        return (angular, speed)
-    
-
-    # A function to randomly generate linked traits 
-    def genetic_velocities(self):
-
-        speed_percentage = random.uniform(0, 1)
-        speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
-
-        angular_percentage = 1 - speed_percentage
-        angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
-
-        return (angular, speed)
-
-
-    # Adapted from SimpleMotion class
-    def _laser_callback(self, msg):
-        """Processing of laser message."""
-        # Access to the index of the measurement in front of the robot.
-        # NOTE: assumption: the one at angle 0 corresponds to the front.
-        i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
-        if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
-            self._close_obstacle = True
-        else:
-            self._close_obstacle = False
-    
-
-    # Rotate in place method adapted from simple_motion class
-    def rotate_in_place(self, rotation_angle):
-        """
-        Rotate in place the robot of rotation_angle (rad) based on fixed velocity.
-        Assumption: Counterclockwise rotation.
-        """
-        twist_msg = Twist()
-        twist_msg.angular.z = self.angular_velocity
-        
-        duration = rotation_angle / twist_msg.angular.z
-        start_time = rospy.get_rostime()
-        rate = rospy.Rate(self.freq)
-        while not rospy.is_shutdown():
-            # Check if done
-            if rospy.get_rostime() - start_time >= rospy.Duration(duration):
-                break
-                
-            # Publish message.
-            self._cmd_pub.publish(twist_msg)
+        for prey in self.prey:
             
-            # Sleep to keep the set frequency.
-            rate.sleep()
+            # Generate random velocities
+            velocities = self.genetic_velocities()
+            angular = velocities[0]
+            linear = velocities[1]
+            
+            # Construct alive message
+            alive = alive_msg()
+            alive.robot_name.data = prey
+            alive.linear_vel.data = linear
+            alive.angular_vel.data = angular
 
-        # Rotated the required angle, stop.
-        self.stop()
+
+            # Update alive robot dictionary
+            self.alive[prey] = (linear, angular)
+
+            # Publish alive message
+            self._alive_pub.publish(alive)
 
 
-    # Move forward method adapted from simple_motion class
-    def move_forward(self, distance):
-        """Function to move_forward for a given distance."""
-        # Rate at which to operate the while loop.
-        rate = rospy.Rate(FREQUENCY)
-
-        # Setting velocities. 
-        twist_msg = Twist()
-        twist_msg.linear.x = self.linear_velocity
-        start_time = rospy.get_rostime()
-        duration = rospy.Duration(distance/twist_msg.linear.x)
-
-        # Loop.
-        while not rospy.is_shutdown():
-            # Check if traveled of given distance based on time.
-            if rospy.get_rostime() - start_time >= duration:
-                break
-
-            # Publish message.
-            if self._close_obstacle:
-                self.stop()
-            else:
-                self._cmd_pub.publish(twist_msg)
-
-            # Sleep to keep the set publishing frequency.
-            rate.sleep()
-
-        # Traveled the required distance, stop.
-        self.stop()
+    # A function to spawn the next generation of prey robots
+    def new_gen(self):
         
-    def _laser_callback(self, msg):
-        """Processing of laser message."""
-        # Access to the index of the measurement in front of the robot.
-        # NOTE: assumption: the one at angle 0 corresponds to the front.
-        i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
-        if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
-            self._close_obstacle = True
-        else:
-            self._close_obstacle = False
+        self.num_ready = 0
+        # Publish message to allocate predator/prey to waypoints
+        new_gen = new_gen_msg()
+        new_gen.new_gen.data = True
+        self._new_gen_pub.publish(new_gen)
+
+        # While loop to ensure all bots are at their waypoints before next round starts
+        while self.ready == False:
+            rospy.sleep(2)
+
+        # Reset number of ready bots
+        self.ready = False
+
+        alive_bots = len(self.alive)
+
+        # For each dead bot, generate new params and send alive message
+        for dead_bot in self.dead:
+            first = random.randint(0, alive_bots)
+            second = random.randint(0, alive_bots)
+
+            # Ensure two different parent bots
+            while second == first:
+                second = random.randint(0, alive_bots)
+
+            first_parent = list(self.alive_bots.keys())[first]
+            second_parent = list(self.alive_bots.keys())[second]
+
+            new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
+            new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
+
+            # Construct alive message
+            alive = alive_msg()
+            alive.robot_name.data = dead_bot
+            alive.linear_vel.data = new_linear
+            alive.angular_vel.data = new_angular
+
+            # Update alive robot dictionary
+            self.alive[dead_bot] = (linear, angular)
+
+            # Publish alive message
+            self._alive_pub.publish(alive)
+
+            # Remove dead_bot from dead list
+            self.dead.remove(dead_bot)
+
+    
+
+    # A function to randomly generate linked velocity traits 
+    def genetic_velocities(self):
+
+        speed_percentage = random.uniform(0, 1)
+        speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
+
+        angular_percentage = 1 - speed_percentage
+        angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
+
+        return (angular, speed)
 
 
-    def stop(self):
-        """Stop the robot."""
-        twist_msg = Twist()
-        self._cmd_pub.publish(twist_msg)
 
+    # CALLBACK FUNCTIONS
+
+    # Callback function which adds prey to prey list
+    def registration_callback(self, msg):
+        self.preys.append(msg.robotname.data)
+
+        # Launch first generation once all prey bots are registered
+        if len(self.preys) == self.num_prey_bots:
+            self.spawn_first_gen()
+
+
+    # Callback function for when a robot is killed
+    def kill_callback(self, msg):
+        # Update lists
+        killed_bot = msg.robot_name.data
+        del self.alive[killed_bot]
+        self.dead.append(killed_bot)
+        self.num_killed += 1
+
+        # If threshold met, start new generation
+        if self.num_killed == num_killed_threshold:
+            self.new_gen()
+            self.num_killed = 0
+
+    # Callback function to ensure every robot has moved to its waypoint before next round
+    def ready_callback(self, msg):
+
+        self.num_ready += 1
+        if self.num_ready == (self.num_prey_bots + self.num_predator_bots):
+            self.ready = True
+    
 
 
 def main():
