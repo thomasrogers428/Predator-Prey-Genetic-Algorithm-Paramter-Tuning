@@ -13,6 +13,7 @@ from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
 
 from ppgapt.msg import Registration
+from ppgapt.msg import Alive_msg
 
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
@@ -56,6 +57,35 @@ class Master():
         
         # Set up subscribers
         self._laser_sub = rospy.Subscriber('base_scan', LaserScan, self._laser_callback, queue_size=1)
+
+        # create service for registration
+        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+
+        # create kill message subscriber
+        self._kill_sub = rospy.Subscriber("kill", Kill, self.kill_callback)
+
+
+    # Callback function which adds prey to prey list
+    def registration_callback(self, msg):
+        self.preys.append(msg.robotname.data)
+
+
+    # Callback function for when a robot is killed
+    def kill_callback(self, msg):
+        return
+
+
+    # A function to spawn the first generation of robots
+    def spawn_first_gen(self):
+
+        for i in range(0, self.first_gen):
+            name = "robot_" + str(i)
+            # Generate random parameters 
+            prey_x = Prey()
+
+    
+    
+
 
     
     def run(self):
