@@ -1,0 +1,204 @@
+#!/usr/bin/env python
+
+import math
+
+# import of relevant libraries.
+import rospy # module for ROS APIs
+import tf
+
+# import msg/action/srv
+from geometry_msgs.msg import Twist # message type for cmd_vel
+from sensor_msgs.msg import LaserScan # message type for scan
+from nav_msgs.msg import Odometry # message type for odom
+from turtlesim.msg import Pose
+
+from ppgapt.msg import Registration
+
+LASER_ANGLE_FRONT = 0 # radians
+MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
+
+
+# Constants
+FREQUENCY = 10 #Hz.
+LASER_ANGLE_FRONT = 0 # radians
+LINEAR_VELOCITY = 0.2 # m/s
+ANGULAR_VELOCITY = math.pi/4 # rad/s
+MIN_THRESHOLD_DISTANCE = 0.8 # m, threshold distance.
+
+MIN_LINEAR_VEL = 0.05 # m/s
+MAX_LINEAR_VEL = 2.00 # m/s
+MIN_ANGULAR_VEL = math.pi/8 # rad/s
+MAX_ANGULAR_VEL = math.pi # rad/s
+
+
+
+class Master():
+    def __init__(self, linear_velocity=LINEAR_VELOCITY, angular_velocity=ANGULAR_VELOCITY):
+
+        velocities = self.genetic_velocities()
+        self.angular_velocity = velocities[0]
+        self.linear_velocity = velocities[1]
+        self.namespace = rospy.get_namespace()
+        self._close_obstacle = None
+
+        # Set up publishers
+        cmd_vel_topic = self.name + "/cmd_vel"
+        self._cmd_pub = rospy.Publisher(cmd_vel_topic, Twist, queue_size=1)
+        
+        odom_topic = self.namespace + "/odom"
+        self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
+
+        # Register prey robot with predators
+        self._registration_pub = rospy.Publisher("registration", Registration, queue_size=1)
+        registration_msg = Registration()
+        registration_msg.robotname = self.namespace
+        self._registration_pub.publish(registration_msg)
+        
+        # Set up subscribers
+        self._laser_sub = rospy.Subscriber('base_scan', LaserScan, self._laser_callback, queue_size=1)
+
+    
+    def run(self):
+
+        self.rotate_in_place(random.uniform(0, 2*math.pi))
+        self.move_forward(random.uniform(1, 3))
+
+
+    # A function to randomly generate linked traits 
+    def genetic_velocities(self):
+
+        speed_percentage = random.uniform(0, 1)
+        speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
+
+        angular_percentage = 1 - speed_percentage
+        angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
+
+        return (angular, speed)
+
+
+    # Adapted from SimpleMotion class
+    def _laser_callback(self, msg):
+        """Processing of laser message."""
+        # Access to the index of the measurement in front of the robot.
+        # NOTE: assumption: the one at angle 0 corresponds to the front.
+        i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
+        if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
+            self._close_obstacle = True
+        else:
+            self._close_obstacle = False
+    
+
+    # Rotate in place method adapted from simple_motion class
+    def rotate_in_place(self, rotation_angle):
+        """
+        Rotate in place the robot of rotation_angle (rad) based on fixed velocity.
+        Assumption: Counterclockwise rotation.
+        """
+        twist_msg = Twist()
+        twist_msg.angular.z = self.angular_velocity
+        
+        duration = rotation_angle / twist_msg.angular.z
+        start_time = rospy.get_rostime()
+        rate = rospy.Rate(self.freq)
+        while not rospy.is_shutdown():
+            # Check if done
+            if rospy.get_rostime() - start_time >= rospy.Duration(duration):
+                break
+                
+            # Publish message.
+            self._cmd_pub.publish(twist_msg)
+            
+            # Sleep to keep the set frequency.
+            rate.sleep()
+
+        # Rotated the required angle, stop.
+        self.stop()
+
+
+    # Move forward method adapted from simple_motion class
+    def move_forward(self, distance):
+        """Function to move_forward for a given distance."""
+        # Rate at which to operate the while loop.
+        rate = rospy.Rate(FREQUENCY)
+
+        # Setting velocities. 
+        twist_msg = Twist()
+        twist_msg.linear.x = self.linear_velocity
+        start_time = rospy.get_rostime()
+        duration = rospy.Duration(distance/twist_msg.linear.x)
+
+        # Loop.
+        while not rospy.is_shutdown():
+            # Check if traveled of given distance based on time.
+            if rospy.get_rostime() - start_time >= duration:
+                break
+
+            # Publish message.
+            if self._close_obstacle:
+                self.stop()
+            else:
+                self._cmd_pub.publish(twist_msg)
+
+            # Sleep to keep the set publishing frequency.
+            rate.sleep()
+
+        # Traveled the required distance, stop.
+        self.stop()
+        
+    def _laser_callback(self, msg):
+        """Processing of laser message."""
+        # Access to the index of the measurement in front of the robot.
+        # NOTE: assumption: the one at angle 0 corresponds to the front.
+        i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
+        if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
+            self._close_obstacle = True
+        else:
+            self._close_obstacle = False
+
+
+    def stop(self):
+        """Stop the robot."""
+        twist_msg = Twist()
+        self._cmd_pub.publish(twist_msg)
+
+
+
+def main():
+    """Main function."""
+
+    # 1st. initialization of node.
+    rospy.init_node("Master")
+       
+    # Initialize variables
+    freq = 10
+
+
+    # Sleep for a few seconds to wait for the registration.
+    rospy.sleep(2)
+
+    # Initialization of the class for the flocking motion.
+    master = Master()
+
+    # Sleep for a few seconds to wait for the registration.
+    rospy.sleep(2)
+
+    # If interrupted, send a stop command.
+    rospy.on_shutdown(master.stop)
+
+    # Update velocities
+    try:
+        rate = rospy.Rate(freq)
+
+        while not rospy.is_shutdown():
+            master.run()
+            rate.sleep()
+
+    except rospy.ROSInterruptException:
+        rospy.logerr("ROS node interrupted.")
+
+if __name__ == "__main__":
+    """Run the main function."""
+    main()
+
+
+        
