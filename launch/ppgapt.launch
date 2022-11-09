@@ -3,22 +3,103 @@
   <arg name="use_sim_time" default="true"/>
   <param name="use_sim_time" value="$(arg use_sim_time)"/>
 
+  <param name="robot_0_x" value="2"/>
+  <param name="robot_0_y" value="2"/>
+  <param name="robot_1_x" value="4"/>
+  <param name="robot_1_y" value="4"/>
+  <param name="robot_2_x" value="6"/>
+  <param name="robot_2_y" value="6"/>
+  <param name="robot_3_x" value="6"/>
+  <param name="robot_3_y" value="6"/>
+  <param name="robot_4_x" value="2"/>
+  <param name="robot_4_y" value="2"/>
+  <param name="robot_5_x" value="4"/>
+  <param name="robot_5_y" value="4"/>
+  <param name="robot_6_x" value="6"/>
+  <param name="robot_6_y" value="6"/>
+  <param name="robot_7_x" value="2"/>
+  <param name="robot_7_y" value="2"/>
+  <param name="robot_8_x" value="4"/>
+  <param name="robot_8_y" value="4"/>
+  <param name="robot_9_x" value="6"/>
+  <param name="robot_9_y" value="6"/>
+  <param name="robot_10_x" value="6"/>
+  <param name="robot_10_y" value="6"/>
+  <param name="robot_11_x" value="2"/>
+  <param name="robot_12_y" value="2"/>
+  <param name="robot_13_x" value="4"/>
+  <param name="robot_13_y" value="4"/>
+  
+
   <param name="robot_0" value="robot_0"/>
   <param name="robot_1" value="robot_1"/>
   <param name="robot_2" value="robot_2"/>
-
-  <param name="num_robots" value="3"/>
+  <param name="robot_3" value="robot_3"/>
+  <param name="robot_4" value="robot_4"/>
+  <param name="robot_5" value="robot_5"/>
+  <param name="robot_6" value="robot_6"/>
+  <param name="robot_7" value="robot_7"/>
+  <param name="robot_8" value="robot_8"/>
+  <param name="robot_9" value="robot_9"/>
+  <param name="robot_10" value="robot_10"/>
+  <param name="robot_11" value="robot_11"/>
+  <param name="robot_12" value="robot_12"/>
+  <param name="robot_13" value="robot_13"/>
 
   <group ns="robot_0">
-    <node pkg="ppgapt" type="predator" name="predator" output="screen"/>
+    <node pkg="ppgapt" type="Predator" name="Predator" output="screen"/>
   </group>
 
   <group ns="robot_1">
-    <node pkg="ppgapt" type="prey" name="prey" output="screen"/>
+    <node pkg="ppgapt" type="Predator" name="Predator" output="screen"/>
   </group>
 
   <group ns="robot_2">
-    <node pkg="ppgapt" type="prey" name="prey" output="screen"/>
+    <node pkg="ppgapt" type="Predator" name="Predator" output="screen"/>
+  </group>
+
+  <group ns="robot_3">
+    <node pkg="ppgapt" type="Predator" name="Predator" output="screen"/>
+  </group>
+
+  <group ns="robot_4">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_5">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_6">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_7">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_8">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_9">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_10">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_11">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_12">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
+  </group>
+
+  <group ns="robot_13">
+    <node pkg="ppgapt" type="Prey" name="Prey" output="screen"/>
   </group>
 
 </launch>

@@ -11,10 +11,14 @@ from geometry_msgs.msg import Twist # message type for cmd_vel
 from turtlesim.msg import Pose
 from nav_msgs.msg import Odometry # message type for odom
 
-from ppgapt.msg import Registration
-from ppgapt.msg import Kill
+from ppgapt.msg import Registration_msg
+from ppgapt.msg import Kill_msg
 from ppgapt.msg import Alive_msg
 from ppgapt.msg import New_gen_msg
+from ppgapt.msg import Ready_msg
+
+from ppgapt.nodes import SimpleMotion
+
 
 # Constants.
 DEFAULT_PREDATOR_LINEAR_VELOCITY = 10 # m/s
@@ -24,46 +28,46 @@ DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
 DEFAULT_REGISTRATION_TOPIC = "registration"
 DEFAULT_ALIVE_TOPIC = 'alive'
 DEFAULT_NEW_GENERATION_TOPIC = 'new_gen'
+DEFAULT_READY_TOPIC = 'ready'
+
 FREQUENCY = 10
 MAX_DIST = 1000
 
 class Predator():
-    def __init__(self, start_x, start_y):
+    def __init__(self):
         """Constructor."""
         self.namespace = rospy.get_namespace()
-        self.x = start_x
-        self.y = start_y
+
         self.alive_robs = []
         self.odom_dict = {}
-
 
         self.preys = {}
 
         # pub/subs
         self._cmd_pub = rospy.Publisher(self.namespace + DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
-        self._kill_pub = rospy.Publisher(CUSTOM_KILL_TOPIC, Kill, queue_size=1)
+        self._kill_pub = rospy.Publisher(CUSTOM_KILL_TOPIC, Kill_msg, queue_size=1)
         odom_topic = self.namespace + DEFAULT_ODOM_TOPIC
         self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
+        self._ready_pub_ = rospy.Publisher(DEFAULT_READY_TOPIC, Ready_msg, queue_size=1)
 
         # create service for registration
-        self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration, self.registration_callback)
+        self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration_msg, self.registration_callback)
 
         self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
         self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
         self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
 
-        # # init listener
-        # self.listener = tf.TransformListener()
-
         # vel values
         self.linear_velocity = 2 # m/s
         self.angular_velocity = math.pi/4 # rad/s
 
-        self.x, self.y = None, None
+        self.x, self.y, self.theta = None, None, None
+
+        self.start_x, self.start_y =rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_namespace(self.namespace[:-1] + "_y")
 
     def registration_callback(self, msg):
         self.preys[msg.robotname.data] = (None,None)
-        rospy.Subscriber(msg.robotname.data + "/odom", Odometry, self.location_callback, (msg.robotname.data))
+        rospy.Subscriber(msg.robotname.data + "/" + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
 
     def location_callback(self, msg, args):
         self.preys[args[0]] = (msg.pose.pose.x, msg.pose.pose.y)
@@ -74,6 +78,7 @@ class Predator():
     def find_target_prey(self):
         while not self.preys:
             continue
+
         min_dist = MAX_DIST
         target = None
         for prey in self.preys:
@@ -106,7 +111,7 @@ class Predator():
 
         # Update velocities
         try:
-            kill_msg = Kill()
+            kill_msg = Kill_msg()
             kill_msg.robot_name = self.namespace
             self._kill_pub.publish(kill_msg)
 
@@ -117,8 +122,18 @@ class Predator():
         self.alive_robs.append(msg.robot_name)
 
     def _new_gen_callback(self, msg):
-        return 
         # calls back all robot's to their initial pos
+        rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
+        dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
+
+        SimpleMotion.rotate_in_place(rot)
+        SimpleMotion.move_forward(dist)
+        SimpleMotion.rotate_in_place(-self.theta)
+
+        ready_msg = Ready_msg
+        ready_msg.ready = True
+
+        self._ready_pub_.publish(ready_msg)
 
 
 def main():
