@@ -12,9 +12,14 @@ from turtlesim.msg import Pose
 from nav_msgs.msg import Odometry # message type for odom
 
 from ppgapt.msg import Registration
+from ppgapt.msg import Kill
 
 # Constants.
 DEFAULT_PREDATOR_LINEAR_VELOCITY = 10 # m/s
+CUSTOM_KILL_TOPIC = 'kill'
+DEFAULT_ODOM_TOPIC = 'odom'
+DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
+DEFAULT_REGISTRATION_TOPIC = "registration"
 FREQUENCY = 10
 MAX_DIST = 1000
 
@@ -26,12 +31,14 @@ class Predator():
         self.preys = {}
 
         # pub/subs
-        self._cmd_pub = rospy.Publisher(self.namespace + "cmd_vel", Twist, queue_size=1)
+        self._cmd_pub = rospy.Publisher(self.namespace + DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
+        cmd_vel_topic = self.namespace + CUSTOM_KILL_TOPIC
+        self._kill_pub = rospy.Publisher(cmd_vel_topic, Kill, queue_size=1)
 
         # create service for registration
-        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+        self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration, self.registration_callback)
 
-        self._odom_sub = rospy.Subscriber(self.namespace + "odom", Odometry, self.odom_callback)
+        self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
 
         # # init listener
         # self.listener = tf.TransformListener()
@@ -78,6 +85,21 @@ class Predator():
             twist_msg.angular.z = angle
             twist_msg.linear.x = DEFAULT_PREDATOR_LINEAR_VELOCITY
             self._cmd_pub.publish(twist_msg)
+
+    def kill_prey(self):
+        rospy.init_node("Predator")
+        predator = Predator()
+        rospy.sleep(2)
+        rospy.on_shutdown(predator.stop)
+
+        # Update velocities
+        try:
+            kill_msg = Kill()
+            kill_msg.robot_name = self.namespace
+            self._kill_pub.publish(kill_msg)
+
+        except rospy.ROSInterruptException:
+            rospy.logerr("ROS node interrupted.")
 
 
 def main():
