@@ -39,18 +39,17 @@ class Predator():
 
         self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
 
-        # # init listener
-        # self.listener = tf.TransformListener()
-
         # vel values
         self.linear_velocity = 2 # m/s
         self.angular_velocity = math.pi/4 # rad/s
 
         self.x, self.y = None, None
 
+        self.start_x, self.start_y =rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_namespace(self.namespace[:-1] + "_y")
+
     def registration_callback(self, msg):
         self.preys[msg.robotname.data] = (None,None)
-        rospy.Subscriber(msg.robotname.data + "/odom", Odometry, self.location_callback, (msg.robotname.data))
+        rospy.Subscriber(msg.robotname.data + "/" + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
 
     def location_callback(self, msg, args):
         self.preys[args[0]] = (msg.pose.pose.x, msg.pose.pose.y)
@@ -61,6 +60,7 @@ class Predator():
     def find_target_prey(self):
         while not self.preys:
             continue
+
         min_dist = MAX_DIST
         target = None
         for prey in self.preys:
