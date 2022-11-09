@@ -81,15 +81,40 @@ class Master():
         new_gen.new_gen.data = True
         self._new_gen_pub.publish(new_gen)
 
+        while self.ready == False:
+            rospy.sleep(2)
+
         alive_bots = len(self.alive)
-        first_bot = random.randint(0, alive_bots)
-        second_bot = random.randint(0, alive_bots)
 
-        # Ensure two different parent bots
-        while second_bot == first_bot:
-            second_bot = random.randint(0, alive_bots)
+        # For each dead bot, generate new params and send alive message
+        for dead_bot in self.dead:
+            first = random.randint(0, alive_bots)
+            second = random.randint(0, alive_bots)
 
+            # Ensure two different parent bots
+            while second == first:
+                second = random.randint(0, alive_bots)
 
+            first_parent = list(self.alive_bots.keys())[first]
+            second_parent = list(self.alive_bots.keys())[second]
+
+            new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
+            new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
+
+            # Construct alive message
+            alive = alive_msg()
+            alive.robot_name.data = dead_bot
+            alive.linear_vel.data = new_linear
+            alive.angular_vel.data = new_angular
+
+            # Update alive robot dictionary
+            self.alive[dead_bot] = (linear, angular)
+
+            # Publish alive message
+            self._alive_pub.publish(alive)
+
+            # Remove dead_bot from dead list
+            self.dead.remove(dead_bot)
 
     
 
@@ -103,8 +128,6 @@ class Master():
         angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
 
         return (angular, speed)
-
-
 
 
 
@@ -132,8 +155,6 @@ class Master():
             self.new_gen()
             self.num_killed = 0
     
-
-
 
 
 def main():
