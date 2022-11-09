@@ -18,21 +18,26 @@ from ppgapt.msg import Registration
 from ppgapt.msg import kill_msg
 from ppgapt.msg import alive_msg
 from ppgapt.msg import new_gen_msg
+from ppgapt.msg import ready_msg
 
 
 # Constants
-NUM_BOTS = 10 # Number of prey bots
+NUM_PREY_BOTS = 10 # Number of prey bots
+NUM_PREDATOR_BOTS = 2 # Number of predator bots
 KILLED_THRESHOLD = 4 # Once 4 bots are killed, a new generation is spawned
-
 
 
 class Master():
     def __init__(self):
 
-        self.num_bots = NUM_BOTS
+        self.num_prey_bots = NUM_PREY_BOTS
+        self.num_predator_bots = NUM_PREDATOR_BOTS
         self.num_killed = 0
         self.num_killed_threshold = KILLED_THRESHOLD
         self.generation_count = 0
+
+        self.ready = False
+        self.num_ready = 0
 
         self.prey = []
         self.alive = {}
@@ -45,6 +50,7 @@ class Master():
         # Set up subscribers
         # create service for registration
         self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+        self._ready_sub = rospy.Subscriber("ready", ready_msg, self.ready_callback)
 
         # create kill message subscriber
         self._kill_sub = rospy.Subscriber("kill", Kill, self.kill_callback)
@@ -75,14 +81,19 @@ class Master():
 
     # A function to spawn the next generation of prey robots
     def new_gen(self):
-
+        
+        self.num_ready = 0
         # Publish message to allocate predator/prey to waypoints
         new_gen = new_gen_msg()
         new_gen.new_gen.data = True
         self._new_gen_pub.publish(new_gen)
 
+        # While loop to ensure all bots are at their waypoints before next round starts
         while self.ready == False:
             rospy.sleep(2)
+
+        # Reset number of ready bots
+        self.ready = False
 
         alive_bots = len(self.alive)
 
@@ -138,7 +149,7 @@ class Master():
         self.preys.append(msg.robotname.data)
 
         # Launch first generation once all prey bots are registered
-        if len(self.preys) == self.num_bots:
+        if len(self.preys) == self.num_prey_bots:
             self.spawn_first_gen()
 
 
@@ -154,6 +165,13 @@ class Master():
         if self.num_killed == num_killed_threshold:
             self.new_gen()
             self.num_killed = 0
+
+    # Callback function to ensure every robot has moved to its waypoint before next round
+    def ready_callback(self, msg):
+
+        self.num_ready += 1
+        if self.num_ready == (self.num_prey_bots + self.num_predator_bots):
+            self.ready = True
     
 
 
