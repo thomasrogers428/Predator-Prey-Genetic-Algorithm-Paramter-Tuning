@@ -32,8 +32,7 @@ class Predator():
 
         # pub/subs
         self._cmd_pub = rospy.Publisher(self.namespace + DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
-        cmd_vel_topic = self.namespace + CUSTOM_KILL_TOPIC
-        self._kill_pub = rospy.Publisher(cmd_vel_topic, Kill, queue_size=1)
+        self._kill_pub = rospy.Publisher(CUSTOM_KILL_TOPIC, Kill, queue_size=1)
 
         # create service for registration
         self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration, self.registration_callback)
