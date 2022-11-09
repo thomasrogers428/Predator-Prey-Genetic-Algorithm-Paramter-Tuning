@@ -14,9 +14,10 @@ from turtlesim.msg import Pose
 from Prey import Prey
 
 from ppgapt.msg import Registration
-from ppgapt.msg import Kill
+from ppgapt.msg import Alive_msg
 
-
+LASER_ANGLE_FRONT = 0 # radians
+MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 # Constants
 FIRST_GEN_BOTS = 10 # Number of prey bots in the first generation
 KILLED_THRESHOLD = 4 # Once 4 bots are killed, a new generation is spawned
@@ -51,6 +52,35 @@ class Master():
     # Callback function for when a robot is killed
     def kill_callback(self, msg):
 
+
+
+    # A function to spawn the first generation of robots
+    def spawn_first_gen(self):
+
+        for i in range(0, self.first_gen):
+            name = "robot_" + str(i)
+            # Generate random parameters 
+            prey_x = Prey()
+
+    
+    
+
+
+        # create service for registration
+        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+
+        # create kill message subscriber
+        self._kill_sub = rospy.Subscriber("kill", Kill, self.kill_callback)
+
+
+    # Callback function which adds prey to prey list
+    def registration_callback(self, msg):
+        self.preys.append(msg.robotname.data)
+
+
+    # Callback function for when a robot is killed
+    def kill_callback(self, msg):
+        return
 
 
     # A function to spawn the first generation of robots

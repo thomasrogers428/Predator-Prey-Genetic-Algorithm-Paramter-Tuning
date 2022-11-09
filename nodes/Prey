@@ -14,6 +14,8 @@ from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
 
 from ppgapt.msg import Registration
+from ppgapt.msg import Alive_msg
+from ppgapt.msg import Kill
 
 
 LASER_ANGLE_FRONT = 0 # radians
@@ -36,17 +38,24 @@ DEFAULT_ODOM_TOPIC = 'odom'
 DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
 DEFAULT_REGISTRATION_TOPIC = "registration"
 DEFAULT_LASER_TOPIC = 'base_scan'
+DEFAULT_ALIVE_TOPIC = 'alive'
+CUSTOM_KILL_TOPIC = 'kill'
 
 
 
 class Prey():
-    def __init__(self, linear_velocity, angular_velocity):
+    def __init__(self, start_x, start_y):
 
-        velocities = self.genetic_velocities()
-        self.angular_velocity = velocities[0]
-        self.linear_velocity = velocities[1]
+        # velocities = self.genetic_velocities()
+        self.angular_velocity = 0
+        self.linear_velocity = 0
         self.namespace = rospy.get_namespace()
         self._close_obstacle = None
+        self.x = start_x
+        self.y = start_y
+
+        self.is_alive = True
+        self.odom_dict = {}
 
         # Set up publishers
         cmd_vel_topic = self.namespace + DEFAULT_CMD_VEL_TOPIC
@@ -64,9 +73,12 @@ class Prey():
         
         # Set up subscribers
         self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
+        self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
+        self._odom_sub = rospy.Subscriber(odom_topic, Odometry, self._odom_callback, queue_size=1)
+        self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill, self._kill_callback, queue_size=1)
 
-    # method to avoid predators
-    def run(self):
+    # method to avoid predators using separation
+    def evade(self):
 
         self.rotate_in_place(random.uniform(0, 2*math.pi))
         self.move_forward(random.uniform(1, 3))
@@ -153,6 +165,20 @@ class Prey():
         twist_msg = Twist()
         self._cmd_pub.publish(twist_msg)
     
+    def _is_alive_callback(self, msg):
+        self.is_alive = True
+        self.linear_velocity = msg.linear_vel
+        self.angular_velocity = msg.angular_vel
+
+    def _odom_callback(self, msg):
+        return
+    
+    def _kill_callback(self, msg):
+        self.is_alive = False
+        self.angular_velocity = 0
+        self.linear_velocity = 0
+
+
     # A function to randomly generate linked traits 
     # def genetic_velocities(self):
 
@@ -193,7 +219,7 @@ def main():
         rate = rospy.Rate(freq)
 
         while not rospy.is_shutdown():
-            prey.run()
+            prey.evade()
             rate.sleep()
 
     except rospy.ROSInterruptException:
