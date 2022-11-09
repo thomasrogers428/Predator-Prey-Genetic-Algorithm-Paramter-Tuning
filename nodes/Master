@@ -21,6 +21,8 @@ from ppgapt.msg import new_gen_msg
 from ppgapt.msg import ready_msg
 
 
+LASER_ANGLE_FRONT = 0 # radians
+MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 # Constants
 NUM_PREY_BOTS = 10 # Number of prey bots
 NUM_PREDATOR_BOTS = 2 # Number of predator bots
@@ -71,6 +73,7 @@ class Master():
             alive.robot_name.data = prey
             alive.linear_vel.data = linear
             alive.angular_vel.data = angular
+
 
             # Update alive robot dictionary
             self.alive[prey] = (linear, angular)

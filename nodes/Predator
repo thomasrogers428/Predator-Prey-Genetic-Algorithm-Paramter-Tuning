@@ -9,28 +9,48 @@ import tf
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
 from turtlesim.msg import Pose
+from nav_msgs.msg import Odometry # message type for odom
 
 from ppgapt.msg import Registration
+from ppgapt.msg import Kill
+from ppgapt.msg import Alive_msg
+from ppgapt.msg import New_gen_msg
 
 # Constants.
 DEFAULT_PREDATOR_LINEAR_VELOCITY = 10 # m/s
+CUSTOM_KILL_TOPIC = 'kill'
+DEFAULT_ODOM_TOPIC = 'odom'
+DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
+DEFAULT_REGISTRATION_TOPIC = "registration"
+DEFAULT_ALIVE_TOPIC = 'alive'
+DEFAULT_NEW_GENERATION_TOPIC = 'new_gen'
 FREQUENCY = 10
 MAX_DIST = 1000
 
 class Predator():
-    def __init__(self):
+    def __init__(self, start_x, start_y):
         """Constructor."""
         self.namespace = rospy.get_namespace()
+        self.x = start_x
+        self.y = start_y
+        self.alive_robs = []
+        self.odom_dict = {}
+
 
         self.preys = {}
 
         # pub/subs
-        self._cmd_pub = rospy.Publisher(self.namespace + "cmd_vel", Twist, queue_size=1)
+        self._cmd_pub = rospy.Publisher(self.namespace + DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
+        self._kill_pub = rospy.Publisher(CUSTOM_KILL_TOPIC, Kill, queue_size=1)
+        odom_topic = self.namespace + DEFAULT_ODOM_TOPIC
+        self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
 
         # create service for registration
-        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+        self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration, self.registration_callback)
 
-        self._odom_sub = rospy.Subscriber(self.namespace + "/odom", Twist, self.odom_callback)
+        self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
+        self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
+        self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
 
         # # init listener
         # self.listener = tf.TransformListener()
@@ -43,7 +63,7 @@ class Predator():
 
     def registration_callback(self, msg):
         self.preys[msg.robotname.data] = (None,None)
-        rospy.Subscriber(msg.robotname.data + "/odom", Twist, self.location_callback, (msg.robotname.data))
+        rospy.Subscriber(msg.robotname.data + "/odom", Odometry, self.location_callback, (msg.robotname.data))
 
     def location_callback(self, msg, args):
         self.preys[args[0]] = (msg.pose.pose.x, msg.pose.pose.y)
@@ -52,6 +72,8 @@ class Predator():
         self.x, self.y, self.theta = msg.pose.pose.x, msg.pose.pose.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
 
     def find_target_prey(self):
+        while not self.preys:
+            continue
         min_dist = MAX_DIST
         target = None
         for prey in self.preys:
@@ -76,8 +98,29 @@ class Predator():
             twist_msg.linear.x = DEFAULT_PREDATOR_LINEAR_VELOCITY
             self._cmd_pub.publish(twist_msg)
 
+    def kill_prey(self):
+        rospy.init_node("Predator")
+        predator = Predator()
+        rospy.sleep(2)
+        rospy.on_shutdown(predator.stop)
 
-    
+        # Update velocities
+        try:
+            kill_msg = Kill()
+            kill_msg.robot_name = self.namespace
+            self._kill_pub.publish(kill_msg)
+
+        except rospy.ROSInterruptException:
+            rospy.logerr("ROS node interrupted.")
+
+    def _is_alive_callback(self, msg):
+        self.alive_robs.append(msg.robot_name)
+
+    def _new_gen_callback(self, msg):
+        return 
+        # calls back all robot's to their initial pos
+
+
 def main():
     """Main function."""
 
@@ -89,6 +132,8 @@ def main():
 
     # Initialization of the class for the Leader.
     predator = Predator()
+
+    rospy.sleep(2)
     predator.run()
 
 

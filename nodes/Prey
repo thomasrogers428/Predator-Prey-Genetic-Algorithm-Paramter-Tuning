@@ -5,6 +5,7 @@ import math
 # import of relevant libraries.
 import rospy # module for ROS APIs
 import tf
+import random
 
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
@@ -13,6 +14,9 @@ from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
 
 from ppgapt.msg import Registration
+from ppgapt.msg import Alive_msg
+from ppgapt.msg import Kill
+
 
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
@@ -30,52 +34,55 @@ MAX_LINEAR_VEL = 2.00 # m/s
 MIN_ANGULAR_VEL = math.pi/8 # rad/s
 MAX_ANGULAR_VEL = math.pi # rad/s
 
+DEFAULT_ODOM_TOPIC = 'odom'
+DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
+DEFAULT_REGISTRATION_TOPIC = "registration"
+DEFAULT_LASER_TOPIC = 'base_scan'
+DEFAULT_ALIVE_TOPIC = 'alive'
+CUSTOM_KILL_TOPIC = 'kill'
+
 
 
 class Prey():
-    def __init__(self, linear_velocity=LINEAR_VELOCITY, angular_velocity=ANGULAR_VELOCITY):
+    def __init__(self, start_x, start_y):
 
-        velocities = self.genetic_velocities()
-        self.angular_velocity = velocities[0]
-        self.linear_velocity = velocities[1]
+        # velocities = self.genetic_velocities()
+        self.angular_velocity = 0
+        self.linear_velocity = 0
         self.namespace = rospy.get_namespace()
         self._close_obstacle = None
+        self.x = start_x
+        self.y = start_y
+
+        self.is_alive = True
+        self.odom_dict = {}
 
         # Set up publishers
-        cmd_vel_topic = self.name + "/cmd_vel"
+        cmd_vel_topic = self.namespace + DEFAULT_CMD_VEL_TOPIC
         self._cmd_pub = rospy.Publisher(cmd_vel_topic, Twist, queue_size=1)
         
-        odom_topic = self.namespace + "/odom"
+        
+        odom_topic = self.namespace + DEFAULT_ODOM_TOPIC
         self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
 
         # Register prey robot with predators
-        self._registration_pub = rospy.Publisher("registration", Registration, queue_size=1)
+        self._registration_pub = rospy.Publisher(DEFAULT_REGISTRATION_TOPIC, Registration, queue_size=1)
         registration_msg = Registration()
         registration_msg.robotname = self.namespace
         self._registration_pub.publish(registration_msg)
         
         # Set up subscribers
-        self._laser_sub = rospy.Subscriber('base_scan', LaserScan, self._laser_callback, queue_size=1)
+        self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
+        self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
+        self._odom_sub = rospy.Subscriber(odom_topic, Odometry, self._odom_callback, queue_size=1)
+        self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill, self._kill_callback, queue_size=1)
 
-    
-    def run(self):
+    # method to avoid predators using separation
+    def evade(self):
 
         self.rotate_in_place(random.uniform(0, 2*math.pi))
         self.move_forward(random.uniform(1, 3))
-
-
-    # A function to randomly generate linked traits 
-    def genetic_velocities(self):
-
-        speed_percentage = random.uniform(0, 1)
-        speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
-
-        angular_percentage = 1 - speed_percentage
-        angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
-
-        return (angular, speed)
-
-
+        
     # Adapted from SimpleMotion class
     def _laser_callback(self, msg):
         """Processing of laser message."""
@@ -87,7 +94,6 @@ class Prey():
         else:
             self._close_obstacle = False
     
-
     # Rotate in place method adapted from simple_motion class
     def rotate_in_place(self, rotation_angle):
         """
@@ -99,7 +105,7 @@ class Prey():
         
         duration = rotation_angle / twist_msg.angular.z
         start_time = rospy.get_rostime()
-        rate = rospy.Rate(self.freq)
+        rate = rospy.Rate(FREQUENCY)
         while not rospy.is_shutdown():
             # Check if done
             if rospy.get_rostime() - start_time >= rospy.Duration(duration):
@@ -113,7 +119,6 @@ class Prey():
 
         # Rotated the required angle, stop.
         self.stop()
-
 
     # Move forward method adapted from simple_motion class
     def move_forward(self, distance):
@@ -155,11 +160,35 @@ class Prey():
         else:
             self._close_obstacle = False
 
-
     def stop(self):
         """Stop the robot."""
         twist_msg = Twist()
         self._cmd_pub.publish(twist_msg)
+    
+    def _is_alive_callback(self, msg):
+        self.is_alive = True
+        self.linear_velocity = msg.linear_vel
+        self.angular_velocity = msg.angular_vel
+
+    def _odom_callback(self, msg):
+        return
+    
+    def _kill_callback(self, msg):
+        self.is_alive = False
+        self.angular_velocity = 0
+        self.linear_velocity = 0
+
+
+    # A function to randomly generate linked traits 
+    # def genetic_velocities(self):
+
+    #     speed_percentage = random.uniform(0, 1)
+    #     speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
+
+    #     angular_percentage = 1 - speed_percentage
+    #     angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
+
+    #     return (angular, speed)
 
 
 
@@ -190,7 +219,7 @@ def main():
         rate = rospy.Rate(freq)
 
         while not rospy.is_shutdown():
-            prey.run()
+            prey.evade()
             rate.sleep()
 
     except rospy.ROSInterruptException:
@@ -199,6 +228,3 @@ def main():
 if __name__ == "__main__":
     """Run the main function."""
     main()
-
-
-        
