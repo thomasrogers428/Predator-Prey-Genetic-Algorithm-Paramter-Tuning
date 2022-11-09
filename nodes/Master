@@ -11,58 +11,78 @@ from geometry_msgs.msg import Twist # message type for cmd_vel
 from sensor_msgs.msg import LaserScan # message type for scan
 from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
+from Prey import Prey
 
 from ppgapt.msg import Registration
-
-LASER_ANGLE_FRONT = 0 # radians
-MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
+from ppgapt.msg import Kill
 
 
 # Constants
-FREQUENCY = 10 #Hz.
-LASER_ANGLE_FRONT = 0 # radians
-LINEAR_VELOCITY = 0.2 # m/s
-ANGULAR_VELOCITY = math.pi/4 # rad/s
-MIN_THRESHOLD_DISTANCE = 0.8 # m, threshold distance.
-
-MIN_LINEAR_VEL = 0.05 # m/s
-MAX_LINEAR_VEL = 2.00 # m/s
-MIN_ANGULAR_VEL = math.pi/8 # rad/s
-MAX_ANGULAR_VEL = math.pi # rad/s
+FIRST_GEN_BOTS = 10 # Number of prey bots in the first generation
+KILLED_THRESHOLD = 4 # Once 4 bots are killed, a new generation is spawned
 
 
 
 class Master():
-    def __init__(self, linear_velocity=LINEAR_VELOCITY, angular_velocity=ANGULAR_VELOCITY):
+    def __init__(self):
 
-        velocities = self.genetic_velocities()
-        self.angular_velocity = velocities[0]
-        self.linear_velocity = velocities[1]
-        self.namespace = rospy.get_namespace()
-        self._close_obstacle = None
+        self.first_gen = FIRST_GEN_BOTS
+        self.num_killed = 0
+        self.num_killed_threshold = KILLED_THRESHOLD
+        self.generation_count = 0
 
-        # Set up publishers
-        cmd_vel_topic = self.name + "/cmd_vel"
-        self._cmd_pub = rospy.Publisher(cmd_vel_topic, Twist, queue_size=1)
-        
-        odom_topic = self.namespace + "/odom"
-        self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
+        self.preys = []
+        self.spawn_first_gen()
 
-        # Register prey robot with predators
-        self._registration_pub = rospy.Publisher("registration", Registration, queue_size=1)
-        registration_msg = Registration()
-        registration_msg.robotname = self.namespace
-        self._registration_pub.publish(registration_msg)
-        
         # Set up subscribers
-        self._laser_sub = rospy.Subscriber('base_scan', LaserScan, self._laser_callback, queue_size=1)
+
+        # create service for registration
+        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
+
+        # create kill message subscriber
+        self._kill_sub = rospy.Subscriber("kill", Kill, self.kill_callback)
+
+
+    # Callback function which adds prey to prey list
+    def registration_callback(self, msg):
+        self.preys.append(msg.robotname.data)
+
+
+    # Callback function for when a robot is killed
+    def kill_callback(self, msg):
+
+
+
+    # A function to spawn the first generation of robots
+    def spawn_first_gen(self):
+
+        for i in range(0, self.first_gen):
+            name = "robot_" + str(i)
+            # Generate random parameters 
+            prey_x = Prey()
 
     
-    def run(self):
+    
 
-        self.rotate_in_place(random.uniform(0, 2*math.pi))
-        self.move_forward(random.uniform(1, 3))
 
+    
+
+
+
+
+
+
+    # A function to randomly generate linked traits 
+    def genetic_velocities(self):
+
+        speed_percentage = random.uniform(0, 1)
+        speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
+
+        angular_percentage = 1 - speed_percentage
+        angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
+
+        return (angular, speed)
+    
 
     # A function to randomly generate linked traits 
     def genetic_velocities(self):
@@ -190,7 +210,6 @@ def main():
         rate = rospy.Rate(freq)
 
         while not rospy.is_shutdown():
-            master.run()
             rate.sleep()
 
     except rospy.ROSInterruptException:
