@@ -51,7 +51,7 @@ class Master():
 
     # Callback function for when a robot is killed
     def kill_callback(self, msg):
-
+        return
 
 
     # A function to spawn the first generation of robots
