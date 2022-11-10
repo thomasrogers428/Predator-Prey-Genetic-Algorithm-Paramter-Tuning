@@ -2,27 +2,23 @@
 
 # import of relevant libraries.
 import rospy # module for ROS APIs
-import tf
-import random
 
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
-from sensor_msgs.msg import LaserScan # message type for scan
-from nav_msgs.msg import Odometry # message type for odom
-from turtlesim.msg import Pose
+
 
 FREQUENCY = 10 #Hz.
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = 0.8 # m, threshold distance.
 
 # Rotate in place method adapted from simple_motion class
-def rotate_in_place(self, rotation_angle):
+def rotate_in_place(rotation_angle, cmd_pub, angular_velocity):
     """
     Rotate in place the robot of rotation_angle (rad) based on fixed velocity.
     Assumption: Counterclockwise rotation.
     """
     twist_msg = Twist()
-    twist_msg.angular.z = self.angular_velocity
+    twist_msg.angular.z = angular_velocity
     
     duration = rotation_angle / twist_msg.angular.z
     start_time = rospy.get_rostime()
@@ -33,23 +29,23 @@ def rotate_in_place(self, rotation_angle):
             break
             
         # Publish message.
-        self._cmd_pub.publish(twist_msg)
+        cmd_pub.publish(twist_msg)
         
         # Sleep to keep the set frequency.
         rate.sleep()
 
     # Rotated the required angle, stop.
-    self.stop()
+    stop(cmd_pub)
 
 # Move forward method adapted from simple_motion class
-def move_forward(self, distance):
+def move_forward(distance, cmd_pub, linear_velocity):
     """Function to move_forward for a given distance."""
     # Rate at which to operate the while loop.
     rate = rospy.Rate(FREQUENCY)
 
     # Setting velocities. 
     twist_msg = Twist()
-    twist_msg.linear.x = self.linear_velocity
+    twist_msg.linear.x = linear_velocity
     start_time = rospy.get_rostime()
     duration = rospy.Duration(distance/twist_msg.linear.x)
 
@@ -59,24 +55,15 @@ def move_forward(self, distance):
         if rospy.get_rostime() - start_time >= duration:
             break
 
-        # Publish message.
-        if self._close_obstacle:
-            self.stop()
-        else:
-            self._cmd_pub.publish(twist_msg)
+        cmd_pub.publish(twist_msg)
 
         # Sleep to keep the set publishing frequency.
         rate.sleep()
 
     # Traveled the required distance, stop.
-    self.stop()
+    stop(cmd_pub)
     
-def _laser_callback(self, msg):
-    """Processing of laser message."""
-    # Access to the index of the measurement in front of the robot.
-    # NOTE: assumption: the one at angle 0 corresponds to the front.
-    i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
-    if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
-        self._close_obstacle = True
-    else:
-        self._close_obstacle = False
+def stop(cmd_pub):
+    """Stop the robot."""
+    twist_msg = Twist()
+    cmd_pub.publish(twist_msg)

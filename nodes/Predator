@@ -17,7 +17,7 @@ from ppgapt.msg import Alive_msg
 from ppgapt.msg import New_gen_msg
 from ppgapt.msg import Ready_msg
 
-from ppgapt.nodes import SimpleMotion
+from SimpleMotion import *
 
 
 # Constants.
@@ -63,7 +63,7 @@ class Predator():
 
         self.x, self.y, self.theta = None, None, None
 
-        self.start_x, self.start_y =rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_namespace(self.namespace[:-1] + "_y")
+        self.start_x, self.start_y =rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_param(self.namespace[:-1] + "_y")
 
     def registration_callback(self, msg):
         self.preys[msg.robotname.data] = (None,None)
@@ -73,7 +73,14 @@ class Predator():
         self.preys[args[0]] = (msg.pose.pose.x, msg.pose.pose.y)
 
     def odom_callback(self, msg):
-        self.x, self.y, self.theta = msg.pose.pose.x, msg.pose.pose.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
+        self.x, self.y, self.theta = msg.pose.pose.position.x, msg.pose.pose.position.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
+
+    def _laser_callback(self, msg):
+        i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
+        if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
+            self._close_obstacle = True
+        else:
+            self._close_obstacle = False
 
     def find_target_prey(self):
         while not self.preys:
@@ -126,9 +133,9 @@ class Predator():
         rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
         dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
 
-        SimpleMotion.rotate_in_place(rot)
-        SimpleMotion.move_forward(dist)
-        SimpleMotion.rotate_in_place(-self.theta)
+        rotate_in_place(rot, self._cmd_pub, self.angular_velocity)
+        move_forward(dist,self._cmd_pub, self.linear_velocity)
+        rotate_in_place(-self.theta, self._cmd_pub, self.angular_velocity)
 
         ready_msg = Ready_msg
         ready_msg.ready = True

@@ -122,7 +122,7 @@ class Master():
             alive.angular_vel.data = new_angular
 
             # Update alive robot dictionary
-            self.alive[dead_bot] = (linear, angular)
+            self.alive[dead_bot] = (new_linear, new_angular)
 
             # Publish alive message
             self._alive_pub.publish(alive)
