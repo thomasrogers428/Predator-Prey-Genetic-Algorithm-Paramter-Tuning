@@ -17,8 +17,6 @@ from ppgapt.msg import Alive_msg
 from ppgapt.msg import New_gen_msg
 from ppgapt.msg import Ready_msg
 
-from SimpleMotion import *
-
 
 # Constants.
 DEFAULT_PREDATOR_LINEAR_VELOCITY = 10 # m/s
@@ -29,6 +27,9 @@ DEFAULT_REGISTRATION_TOPIC = "registration"
 DEFAULT_ALIVE_TOPIC = 'alive'
 DEFAULT_NEW_GENERATION_TOPIC = 'new_gen'
 DEFAULT_READY_TOPIC = 'ready'
+
+LASER_ANGLE_FRONT = 0 # radians
+MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 
 FREQUENCY = 10
 MAX_DIST = 1000
@@ -133,14 +134,70 @@ class Predator():
         rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
         dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
 
-        rotate_in_place(rot, self._cmd_pub, self.angular_velocity)
-        move_forward(dist,self._cmd_pub, self.linear_velocity)
-        rotate_in_place(-self.theta, self._cmd_pub, self.angular_velocity)
+        self.rotate_in_place(rot)
+        self.move_forward(dist)
+        self.rotate_in_place(-self.theta)
 
         ready_msg = Ready_msg
         ready_msg.ready = True
 
         self._ready_pub_.publish(ready_msg)
+
+    def move_forward(self, distance):
+
+        # Rate at which to operate the while loop.
+        rate = rospy.Rate(FREQUENCY)
+
+        # Setting velocities. 
+        twist_msg = Twist()
+        twist_msg.linear.x = self.linear_velocity
+        start_time = rospy.get_rostime()
+        duration = rospy.Duration(distance/twist_msg.linear.x)
+
+        # Loop.
+        while not rospy.is_shutdown():
+            # Check if traveled of given distance based on time.
+            if rospy.get_rostime() - start_time >= duration:
+                break
+
+            # Publish message.
+            if self._close_obstacle:
+                self.stop()
+            else:
+                self._cmd_pub.publish(twist_msg)
+
+            # Sleep to keep the set publishing frequency.
+            rate.sleep()
+
+        # Traveled the required distance, stop.
+        self.stop()
+        
+    def rotate_in_place(self, rotation_angle):
+
+        twist_msg = Twist()
+        twist_msg.angular.z = self.angular_velocity
+        
+        duration = rotation_angle / twist_msg.angular.z
+        start_time = rospy.get_rostime()
+        rate = rospy.Rate(FREQUENCY)
+        while not rospy.is_shutdown():
+            # Check if done
+            if rospy.get_rostime() - start_time >= rospy.Duration(duration):
+                break
+                
+            # Publish message.
+            self._cmd_pub.publish(twist_msg)
+            
+            # Sleep to keep the set frequency.
+            rate.sleep()
+
+        # Rotated the required angle, stop.
+        self.stop()
+
+    def stop(self):
+
+        twist_msg = Twist()
+        self._cmd_pub.publish(twist_msg)
 
 
 def main():
