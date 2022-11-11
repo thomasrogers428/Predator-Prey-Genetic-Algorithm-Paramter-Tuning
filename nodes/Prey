@@ -32,10 +32,10 @@ MAX_ANGULAR_VEL = math.pi # rad/s
 
 DEFAULT_ODOM_TOPIC = 'odom'
 DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
-DEFAULT_REGISTRATION_TOPIC = "registration"
+DEFAULT_REGISTRATION_TOPIC = "/registration"
 DEFAULT_LASER_TOPIC = 'base_scan'
-DEFAULT_ALIVE_TOPIC = 'alive'
-CUSTOM_KILL_TOPIC = 'kill'
+DEFAULT_ALIVE_TOPIC = '/alive'
+CUSTOM_KILL_TOPIC = '/kill'
 
 
 
@@ -59,13 +59,10 @@ class Prey():
         
         
         odom_topic = self.namespace + DEFAULT_ODOM_TOPIC
-        self._odom_pub_ = rospy.Publisher(odom_topic, Pose, queue_size=1)
+        self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
 
         # Register prey robot with predators
         self._registration_pub = rospy.Publisher(DEFAULT_REGISTRATION_TOPIC, Registration_msg, queue_size=1)
-        registration_msg = Registration_msg()
-        registration_msg.robotname = self.namespace
-        self._registration_pub.publish(registration_msg)
         
         # Set up subscribers
         self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
@@ -75,6 +72,10 @@ class Prey():
 
     # method to avoid predators using separation
     def evade(self):
+        print("Message Sent")
+        registration_msg = Registration_msg()
+        registration_msg.robotname.data = self.namespace
+        self._registration_pub.publish(registration_msg)
 
         self.rotate_in_place(random.uniform(0, 2*math.pi))
         self.move_forward(random.uniform(1, 3))
@@ -184,7 +185,6 @@ def main():
     # Initialize variables
     freq = 10
 
-
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
@@ -196,6 +196,7 @@ def main():
 
     # # If interrupted, send a stop command.
     # rospy.on_shutdown(stop(prey._cmd_pub))
+
 
     # Update velocities
     try:

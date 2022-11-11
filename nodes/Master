@@ -14,11 +14,11 @@ from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
 from Prey import Prey
 
-from ppgapt.msg import Registration
-from ppgapt.msg import kill_msg
-from ppgapt.msg import alive_msg
-from ppgapt.msg import new_gen_msg
-from ppgapt.msg import ready_msg
+from ppgapt.msg import Registration_msg
+from ppgapt.msg import Kill_msg
+from ppgapt.msg import Alive_msg
+from ppgapt.msg import New_gen_msg
+from ppgapt.msg import Ready_msg
 
 
 LASER_ANGLE_FRONT = 0 # radians
@@ -46,16 +46,16 @@ class Master():
         self.dead = []
 
         # Custom message publisher
-        self._alive_pub = rospy.Publisher("alive", alive_msg, queue_size=1)
-        self._new_gen_pub = rospy.Publisher("new_gen", new_gen_msg, queue_size=1)
+        self._alive_pub = rospy.Publisher("/alive", Alive_msg, queue_size=1)
+        self._new_gen_pub = rospy.Publisher("/new_gen", New_gen_msg, queue_size=1)
 
         # Set up subscribers
         # create service for registration
-        self._registration_sub = rospy.Subscriber("registration", Registration, self.registration_callback)
-        self._ready_sub = rospy.Subscriber("ready", ready_msg, self.ready_callback)
+        self._registration_sub = rospy.Subscriber("/registration", Registration_msg, self.registration_callback)
+        self._ready_sub = rospy.Subscriber("/ready", Ready_msg, self.ready_callback)
 
         # create kill message subscriber
-        self._kill_sub = rospy.Subscriber("kill", Kill, self.kill_callback)
+        self._kill_sub = rospy.Subscriber("/kill", Kill_msg, self.kill_callback)
 
 
     # A function to spawn the first generation of predator and prey robots
@@ -69,7 +69,7 @@ class Master():
             linear = velocities[1]
             
             # Construct alive message
-            alive = alive_msg()
+            alive = Alive_msg()
             alive.robot_name.data = prey
             alive.linear_vel.data = linear
             alive.angular_vel.data = angular
@@ -87,7 +87,7 @@ class Master():
         
         self.num_ready = 0
         # Publish message to allocate predator/prey to waypoints
-        new_gen = new_gen_msg()
+        new_gen = New_gen_msg()
         new_gen.new_gen.data = True
         self._new_gen_pub.publish(new_gen)
 
@@ -116,7 +116,7 @@ class Master():
             new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
 
             # Construct alive message
-            alive = alive_msg()
+            alive = Alive_msg()
             alive.robot_name.data = dead_bot
             alive.linear_vel.data = new_linear
             alive.angular_vel.data = new_angular
