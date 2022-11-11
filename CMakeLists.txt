@@ -30,7 +30,11 @@ catkin_python_setup()
 add_message_files(
   DIRECTORY msg
   FILES
-  Registration.msg
+  Alive_msg.msg
+  Kill_msg.msg
+  New_gen_msg.msg
+  Ready_msg.msg
+  Registration_msg.msg
 )
 
 

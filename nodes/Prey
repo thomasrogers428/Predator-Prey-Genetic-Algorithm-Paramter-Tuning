@@ -18,10 +18,6 @@ from ppgapt.msg import Alive_msg
 from ppgapt.msg import Kill_msg
 
 
-LASER_ANGLE_FRONT = 0 # radians
-MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
-
-
 # Constants
 FREQUENCY = 10 #Hz.
 LASER_ANGLE_FRONT = 0 # radians
@@ -44,15 +40,15 @@ CUSTOM_KILL_TOPIC = 'kill'
 
 
 class Prey():
-    def __init__(self, start_x, start_y):
+    def __init__(self):
 
         # velocities = self.genetic_velocities()
-        self.angular_velocity = 0
-        self.linear_velocity = 0
+        self.angular_velocity = 1
+        self.linear_velocity = 1
         self.namespace = rospy.get_namespace()
         self._close_obstacle = None
-        self.x = start_x
-        self.y = start_y
+
+        self.start_x, self.start_y = rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_param(self.namespace[:-1] + "_y")
 
         self.is_alive = True
         self.odom_dict = {}
@@ -63,7 +59,7 @@ class Prey():
         
         
         odom_topic = self.namespace + DEFAULT_ODOM_TOPIC
-        self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
+        self._odom_pub_ = rospy.Publisher(odom_topic, Pose, queue_size=1)
 
         # Register prey robot with predators
         self._registration_pub = rospy.Publisher(DEFAULT_REGISTRATION_TOPIC, Registration_msg, queue_size=1)
@@ -83,44 +79,19 @@ class Prey():
         self.rotate_in_place(random.uniform(0, 2*math.pi))
         self.move_forward(random.uniform(1, 3))
         
-    # Adapted from SimpleMotion class
-    def _laser_callback(self, msg):
-        """Processing of laser message."""
-        # Access to the index of the measurement in front of the robot.
-        # NOTE: assumption: the one at angle 0 corresponds to the front.
-        i = int((LASER_ANGLE_FRONT - msg.angle_min) / msg.angle_increment)
-        if msg.ranges[i] <= MIN_THRESHOLD_DISTANCE:
-            self._close_obstacle = True
-        else:
-            self._close_obstacle = False
+    def _is_alive_callback(self, msg):
+        self.is_alive = True
+        self.linear_velocity = msg.linear_vel
+        self.angular_velocity = msg.angular_vel
+
+    def _odom_callback(self, msg):
+        return
     
-    # Rotate in place method adapted from simple_motion class
-    def rotate_in_place(self, rotation_angle):
-        """
-        Rotate in place the robot of rotation_angle (rad) based on fixed velocity.
-        Assumption: Counterclockwise rotation.
-        """
-        twist_msg = Twist()
-        twist_msg.angular.z = self.angular_velocity
-        
-        duration = rotation_angle / twist_msg.angular.z
-        start_time = rospy.get_rostime()
-        rate = rospy.Rate(FREQUENCY)
-        while not rospy.is_shutdown():
-            # Check if done
-            if rospy.get_rostime() - start_time >= rospy.Duration(duration):
-                break
-                
-            # Publish message.
-            self._cmd_pub.publish(twist_msg)
-            
-            # Sleep to keep the set frequency.
-            rate.sleep()
+    def _kill_callback(self, msg):
+        self.is_alive = False
+        self.angular_velocity = 0
+        self.linear_velocity = 0
 
-        # Rotated the required angle, stop.
-        self.stop()
-
-    # Move forward method adapted from simple_motion class
     def move_forward(self, distance):
         """Function to move_forward for a given distance."""
         # Rate at which to operate the while loop.
@@ -150,6 +121,36 @@ class Prey():
         # Traveled the required distance, stop.
         self.stop()
         
+    def rotate_in_place(self, rotation_angle):
+        """
+        Rotate in place the robot of rotation_angle (rad) based on fixed velocity.
+        Assumption: Counterclockwise rotation.
+        """
+        twist_msg = Twist()
+        twist_msg.angular.z = self.angular_velocity
+        
+        duration = rotation_angle / twist_msg.angular.z
+        start_time = rospy.get_rostime()
+        rate = rospy.Rate(FREQUENCY)
+        while not rospy.is_shutdown():
+            # Check if done
+            if rospy.get_rostime() - start_time >= rospy.Duration(duration):
+                break
+                
+            # Publish message.
+            self._cmd_pub.publish(twist_msg)
+            
+            # Sleep to keep the set frequency.
+            rate.sleep()
+
+        # Rotated the required angle, stop.
+        self.stop()
+
+    def stop(self):
+        """Stop the robot."""
+        twist_msg = Twist()
+        self._cmd_pub.publish(twist_msg)
+
     def _laser_callback(self, msg):
         """Processing of laser message."""
         # Access to the index of the measurement in front of the robot.
@@ -159,24 +160,6 @@ class Prey():
             self._close_obstacle = True
         else:
             self._close_obstacle = False
-
-    def stop(self):
-        """Stop the robot."""
-        twist_msg = Twist()
-        self._cmd_pub.publish(twist_msg)
-    
-    def _is_alive_callback(self, msg):
-        self.is_alive = True
-        self.linear_velocity = msg.linear_vel
-        self.angular_velocity = msg.angular_vel
-
-    def _odom_callback(self, msg):
-        return
-    
-    def _kill_callback(self, msg):
-        self.is_alive = False
-        self.angular_velocity = 0
-        self.linear_velocity = 0
 
 
     # A function to randomly generate linked traits 
@@ -211,8 +194,8 @@ def main():
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
-    # If interrupted, send a stop command.
-    rospy.on_shutdown(prey.stop)
+    # # If interrupted, send a stop command.
+    # rospy.on_shutdown(stop(prey._cmd_pub))
 
     # Update velocities
     try:
