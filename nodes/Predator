@@ -66,11 +66,13 @@ class Predator():
 
     def registration_callback(self, msg):
         print(msg)
-        self.preys[msg.robotname.data] = (None,None)
+        if msg.robotname.data not in self.preys:
+            self.preys[msg.robotname.data] = (None,None)
+
         rospy.Subscriber(msg.robotname.data + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
 
     def location_callback(self, msg, args):
-        self.preys[args[0]] = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        self.preys[args] = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
     def odom_callback(self, msg):
         self.x, self.y, self.theta = msg.pose.pose.position.x, msg.pose.pose.position.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
@@ -104,8 +106,10 @@ class Predator():
         print("Running")
         while True:
             target = self.find_target_prey()
+            print(self.preys)
             if not target:
                 continue
+
             target_x, target_y = self.preys[target]
 
             tan_angle = math.atan2(target_y - self.y, target_x - self.x)
