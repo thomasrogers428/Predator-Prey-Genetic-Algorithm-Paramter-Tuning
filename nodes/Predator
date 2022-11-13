@@ -29,6 +29,7 @@ DEFAULT_READY_TOPIC = '/ready'
 
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
+KILLED_THRESHOLD = .5
 
 FREQUENCY = 10
 MAX_DIST = 1000
@@ -38,7 +39,7 @@ class Predator():
         """Constructor."""
         self.namespace = rospy.get_namespace()
 
-        self.alive_robs = []
+        self.alives = set()
         self.odom_dict = {}
 
         self.preys = {}
@@ -65,7 +66,6 @@ class Predator():
         self.start_x, self.start_y =rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_param(self.namespace[:-1] + "_y")
 
     def registration_callback(self, msg):
-        print(msg)
         if msg.robotname.data not in self.preys:
             self.preys[msg.robotname.data] = (None,None)
 
@@ -85,14 +85,14 @@ class Predator():
             self._close_obstacle = False
 
     def find_target_prey(self):
-        while not self.preys:
+        while not self.alives:
             continue
 
         min_dist = MAX_DIST
         target = None
-        for prey in self.preys:
+        for prey in self.alives:
 
-            if self.preys[prey][0] == None:
+            if prey not in self.preys or self.preys[prey][0] == None:
                 continue
 
             dist_to_prey = math.sqrt((self.x - self.preys[prey][0])**2 + (self.y - self.preys[prey][1])**2)
@@ -106,11 +106,14 @@ class Predator():
         print("Running")
         while True:
             target = self.find_target_prey()
-            print(self.preys)
+
             if not target:
                 continue
 
             target_x, target_y = self.preys[target]
+
+            if math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2) < KILLED_THRESHOLD:
+                self.kill_prey(target)
 
             tan_angle = math.atan2(target_y - self.y, target_x - self.x)
 
@@ -121,34 +124,32 @@ class Predator():
             twist_msg.linear.x = DEFAULT_PREDATOR_LINEAR_VELOCITY
             self._cmd_pub.publish(twist_msg)
 
-    def kill_prey(self):
-        rospy.init_node("Predator")
-        predator = Predator()
-        rospy.sleep(2)
-        rospy.on_shutdown(predator.stop)
+    def kill_prey(self, target):
 
-        # Update velocities
-        try:
-            kill_msg = Kill_msg()
-            kill_msg.robot_name = self.namespace
-            self._kill_pub.publish(kill_msg)
+        kill_msg = Kill_msg()
+        kill_msg.robot_name = target
+        self._kill_pub.publish(kill_msg)
+        self.alives.remove(kill_msg.robot_name)
 
-        except rospy.ROSInterruptException:
-            rospy.logerr("ROS node interrupted.")
 
     def _is_alive_callback(self, msg):
-        self.alive_robs.append(msg.robot_name)
+        self.alives.add(msg.robot_name)
 
     def _new_gen_callback(self, msg):
         # calls back all robot's to their initial pos
         rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
         dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
-
+        print(rot, dist, -self.theta)
+        self.linear_velocity = 1
+        self.angular_velocity = 1
         self.rotate_in_place(rot)
         self.move_forward(dist)
         self.rotate_in_place(-self.theta)
 
-        ready_msg = Ready_msg
+        self.linear_velocity = 0
+        self.angular_velocity = 0
+
+        ready_msg = Ready_msg()
         ready_msg.ready = True
 
         self._ready_pub_.publish(ready_msg)
@@ -162,7 +163,10 @@ class Predator():
         twist_msg = Twist()
         twist_msg.linear.x = self.linear_velocity
         start_time = rospy.get_rostime()
-        duration = rospy.Duration(distance/twist_msg.linear.x)
+        if self.linear_velocity != 0:
+            duration = rospy.Duration(distance/twist_msg.linear.x)
+        else:
+            duration = rospy.Duration(0)
 
         # Loop.
         while not rospy.is_shutdown():
@@ -171,10 +175,10 @@ class Predator():
                 break
 
             # Publish message.
-            if self._close_obstacle:
-                self.stop()
-            else:
-                self._cmd_pub.publish(twist_msg)
+            # if self._close_obstacle:
+            #     self.stop()
+            # else:
+            self._cmd_pub.publish(twist_msg)
 
             # Sleep to keep the set publishing frequency.
             rate.sleep()
@@ -187,7 +191,10 @@ class Predator():
         twist_msg = Twist()
         twist_msg.angular.z = self.angular_velocity
         
-        duration = rotation_angle / twist_msg.angular.z
+        if self.linear_velocity != 0:
+            duration = rotation_angle / twist_msg.angular.z
+        else:
+            duration = 0
         start_time = rospy.get_rostime()
         rate = rospy.Rate(FREQUENCY)
         while not rospy.is_shutdown():

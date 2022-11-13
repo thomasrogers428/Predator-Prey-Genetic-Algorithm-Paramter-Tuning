@@ -5,14 +5,13 @@ import math
 # import of relevant libraries.
 import rospy # module for ROS APIs
 import tf
-from random import random
+import random
 
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
 from sensor_msgs.msg import LaserScan # message type for scan
 from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
-from Prey import Prey
 
 from ppgapt.msg import Registration_msg
 from ppgapt.msg import Kill_msg
@@ -22,11 +21,16 @@ from ppgapt.msg import Ready_msg
 
 
 LASER_ANGLE_FRONT = 0 # radians
-MIN_THRESHOLD_DISTANCE = MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
+MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 # Constants
-NUM_PREY_BOTS = 10 # Number of prey bots
-NUM_PREDATOR_BOTS = 2 # Number of predator bots
-KILLED_THRESHOLD = 4 # Once 4 bots are killed, a new generation is spawned
+NUM_PREY_BOTS = 3 # Number of prey bots
+NUM_PREDATOR_BOTS = 1 # Number of predator bots
+KILLED_THRESHOLD = 1 # Once 4 bots are killed, a new generation is spawned
+
+MIN_LINEAR_VEL = 0.05 # m/s
+MAX_LINEAR_VEL = 2.00 # m/s
+MIN_ANGULAR_VEL = math.pi/8 # rad/s
+MAX_ANGULAR_VEL = math.pi # rad/s
 
 
 class Master():
@@ -37,11 +41,12 @@ class Master():
         self.num_killed = 0
         self.num_killed_threshold = KILLED_THRESHOLD
         self.generation_count = 0
+        self.first_gen_spawned = False
 
         self.ready = False
         self.num_ready = 0
 
-        self.prey = []
+        self.prey = set()
         self.alive = {}
         self.dead = []
 
@@ -61,7 +66,10 @@ class Master():
     # A function to spawn the first generation of predator and prey robots
     def spawn_first_gen(self):
 
+        print("spawning first gen")
+
         for prey in self.prey:
+            print("adding prey", prey)
             
             # Generate random velocities
             velocities = self.genetic_velocities()
@@ -70,9 +78,9 @@ class Master():
             
             # Construct alive message
             alive = Alive_msg()
-            alive.robot_name.data = prey
-            alive.linear_vel.data = linear
-            alive.angular_vel.data = angular
+            alive.robot_name = prey
+            alive.linear_vel = linear
+            alive.angular_vel = angular
 
 
             # Update alive robot dictionary
@@ -88,7 +96,7 @@ class Master():
         self.num_ready = 0
         # Publish message to allocate predator/prey to waypoints
         new_gen = New_gen_msg()
-        new_gen.new_gen.data = True
+        new_gen.new_gen = True
         self._new_gen_pub.publish(new_gen)
 
         # While loop to ensure all bots are at their waypoints before next round starts
@@ -98,10 +106,12 @@ class Master():
         # Reset number of ready bots
         self.ready = False
 
-        alive_bots = len(self.alive)
 
         # For each dead bot, generate new params and send alive message
         for dead_bot in self.dead:
+
+            alive_bots = len(self.alive.keys())
+
             first = random.randint(0, alive_bots)
             second = random.randint(0, alive_bots)
 
@@ -109,17 +119,20 @@ class Master():
             while second == first:
                 second = random.randint(0, alive_bots)
 
-            first_parent = list(self.alive_bots.keys())[first]
-            second_parent = list(self.alive_bots.keys())[second]
+            # first_parent = list(self.alive.keys())[first]
+            # second_parent = list(self.alive.keys())[second]
+
+            first_parent = random.choice(list(self.alive.keys()))
+            second_parent = random.choice(list(self.alive.keys()))
 
             new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
             new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
 
             # Construct alive message
             alive = Alive_msg()
-            alive.robot_name.data = dead_bot
-            alive.linear_vel.data = new_linear
-            alive.angular_vel.data = new_angular
+            alive.robot_name = dead_bot
+            alive.linear_vel = new_linear
+            alive.angular_vel = new_angular
 
             # Update alive robot dictionary
             self.alive[dead_bot] = (new_linear, new_angular)
@@ -149,23 +162,27 @@ class Master():
 
     # Callback function which adds prey to prey list
     def registration_callback(self, msg):
-        self.preys.append(msg.robotname.data)
+        self.prey.add(msg.robotname.data)
 
         # Launch first generation once all prey bots are registered
-        if len(self.preys) == self.num_prey_bots:
+        if len(self.prey) == self.num_prey_bots and self.first_gen_spawned == False:
+            self.first_gen_spawned = True
             self.spawn_first_gen()
 
 
     # Callback function for when a robot is killed
     def kill_callback(self, msg):
         # Update lists
-        killed_bot = msg.robot_name.data
-        del self.alive[killed_bot]
-        self.dead.append(killed_bot)
-        self.num_killed += 1
+        killed_bot = msg.robot_name
+        if killed_bot in self.alive:
+            del self.alive[killed_bot]
+            self.dead.append(killed_bot)
+            self.num_killed += 1
+            print("Kill occured")
 
         # If threshold met, start new generation
-        if self.num_killed == num_killed_threshold:
+        if self.num_killed == self.num_killed_threshold:
+            print("spawning new generation")
             self.new_gen()
             self.num_killed = 0
 
@@ -197,18 +214,20 @@ def main():
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
-    # If interrupted, send a stop command.
-    rospy.on_shutdown(master.stop)
+    # # If interrupted, send a stop command.
+    # rospy.on_shutdown(master.stop)
 
     # Update velocities
-    try:
-        rate = rospy.Rate(freq)
+    # try:
+    #     rate = rospy.Rate(freq)
 
-        while not rospy.is_shutdown():
-            rate.sleep()
+    #     while not rospy.is_shutdown():
+    #         rate.sleep()
 
-    except rospy.ROSInterruptException:
-        rospy.logerr("ROS node interrupted.")
+    # except rospy.ROSInterruptException:
+    #     rospy.logerr("ROS node interrupted.")
+
+    rospy.spin()
 
 if __name__ == "__main__":
     """Run the main function."""
