@@ -18,6 +18,7 @@
   <param name="robot_2" value="robot_2"/>
   <param name="robot_3" value="robot_3"/>
 
+  <node pkg="ppgapt" type="Master" name="Master" output="screen"/>
 
   <group ns="robot_0">
     <node pkg="ppgapt" type="Predator" name="Predator" output="screen"/>

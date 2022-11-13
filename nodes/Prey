@@ -16,6 +16,8 @@ from turtlesim.msg import Pose
 from ppgapt.msg import Registration_msg
 from ppgapt.msg import Alive_msg
 from ppgapt.msg import Kill_msg
+from ppgapt.msg import Ready_msg
+from ppgapt.msg import New_gen_msg
 
 
 # Constants
@@ -36,19 +38,21 @@ DEFAULT_REGISTRATION_TOPIC = "/registration"
 DEFAULT_LASER_TOPIC = 'base_scan'
 DEFAULT_ALIVE_TOPIC = '/alive'
 CUSTOM_KILL_TOPIC = '/kill'
-
+DEFAULT_NEW_GENERATION_TOPIC = '/new_gen'
+DEFAULT_READY_TOPIC = '/ready'
 
 
 class Prey():
     def __init__(self):
 
         # velocities = self.genetic_velocities()
-        self.angular_velocity = 1
-        self.linear_velocity = 1
+        self.angular_velocity = 0
+        self.linear_velocity = 0
         self.namespace = rospy.get_namespace()
         self._close_obstacle = None
 
         self.start_x, self.start_y = rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_param(self.namespace[:-1] + "_y")
+        self.x, self.y, self.theta = None, None, None
 
         self.is_alive = True
         self.odom_dict = {}
@@ -56,7 +60,7 @@ class Prey():
         # Set up publishers
         cmd_vel_topic = self.namespace + DEFAULT_CMD_VEL_TOPIC
         self._cmd_pub = rospy.Publisher(cmd_vel_topic, Twist, queue_size=1)
-        
+        self._ready_pub_ = rospy.Publisher(DEFAULT_READY_TOPIC, Ready_msg, queue_size=1)
         
         odom_topic = self.namespace + DEFAULT_ODOM_TOPIC
         self._odom_pub_ = rospy.Publisher(odom_topic, Odometry, queue_size=1)
@@ -69,29 +73,59 @@ class Prey():
         self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
         self._odom_sub = rospy.Subscriber(odom_topic, Odometry, self._odom_callback, queue_size=1)
         self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill_msg, self._kill_callback, queue_size=1)
+        self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
 
     # method to avoid predators using separation
     def evade(self):
-        print("Message Sent")
-        registration_msg = Registration_msg()
-        registration_msg.robotname.data = self.namespace
-        self._registration_pub.publish(registration_msg)
+        if self.is_alive:
+            registration_msg = Registration_msg()
+            registration_msg.robotname.data = self.namespace
+            self._registration_pub.publish(registration_msg)
 
-        self.rotate_in_place(random.uniform(0, 2*math.pi))
-        self.move_forward(random.uniform(1, 3))
+        if self.angular_velocity != 0 and self.linear_velocity != 0:
+            self.rotate_in_place(random.uniform(0, 2*math.pi))
+            self.move_forward(random.uniform(1, 3))
         
     def _is_alive_callback(self, msg):
-        self.is_alive = True
-        self.linear_velocity = msg.linear_vel
-        self.angular_velocity = msg.angular_vel
+        # print("In alive callback")
+
+        if msg.robot_name == self.namespace:
+            # print("I'm alive!")
+            self.is_alive = True
+            self.linear_velocity = msg.linear_vel
+            self.angular_velocity = msg.angular_vel
 
     def _odom_callback(self, msg):
-        return
+        self.x, self.y, self.theta = msg.pose.pose.position.x, msg.pose.pose.position.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
+
     
     def _kill_callback(self, msg):
-        self.is_alive = False
-        self.angular_velocity = 0
+        if msg.robot_name == self.namespace:
+            print(msg.robot_name + "killed")
+            self.is_alive = False
+            self.angular_velocity = 0
+            self.linear_velocity = 0
+
+    def _new_gen_callback(self, msg):
+        # calls back all robot's to their initial pos
+        rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
+        dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
+
+        if self.x != None:
+            self.linear_velocity = 1
+            self.angular_velocity = 1
+            self.rotate_in_place(rot)
+            self.move_forward(dist)
+            self.rotate_in_place(-self.theta)
+        
+
         self.linear_velocity = 0
+        self.angular_velocity = 0
+
+        ready_msg = Ready_msg()
+        ready_msg.ready = True
+
+        self._ready_pub_.publish(ready_msg)
 
     def move_forward(self, distance):
         """Function to move_forward for a given distance."""
@@ -102,7 +136,10 @@ class Prey():
         twist_msg = Twist()
         twist_msg.linear.x = self.linear_velocity
         start_time = rospy.get_rostime()
-        duration = rospy.Duration(distance/twist_msg.linear.x)
+        if twist_msg.linear.x != 0:
+            duration = rospy.Duration(distance/twist_msg.linear.x)
+        else:
+            duration = rospy.Duration(0)
 
         # Loop.
         while not rospy.is_shutdown():
@@ -110,11 +147,11 @@ class Prey():
             if rospy.get_rostime() - start_time >= duration:
                 break
 
-            # Publish message.
-            if self._close_obstacle:
-                self.stop()
-            else:
-                self._cmd_pub.publish(twist_msg)
+            # # Publish message.
+            # if self._close_obstacle:
+            #     self.stop()
+            # else:
+            self._cmd_pub.publish(twist_msg)
 
             # Sleep to keep the set publishing frequency.
             rate.sleep()
@@ -130,7 +167,11 @@ class Prey():
         twist_msg = Twist()
         twist_msg.angular.z = self.angular_velocity
         
-        duration = rotation_angle / twist_msg.angular.z
+        if twist_msg.angular.z != 0:
+            duration = rotation_angle / twist_msg.angular.z
+        else:
+            duration= 0
+            
         start_time = rospy.get_rostime()
         rate = rospy.Rate(FREQUENCY)
         while not rospy.is_shutdown():
@@ -191,6 +232,10 @@ def main():
     # Initialization of the class for the flocking motion.
     prey = Prey()
 
+    # registration_msg = Registration_msg()
+    # registration_msg.robotname.data = prey.namespace
+    # prey._registration_pub.publish(registration_msg)
+
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
@@ -203,7 +248,8 @@ def main():
         rate = rospy.Rate(freq)
 
         while not rospy.is_shutdown():
-            prey.evade()
+            if prey.is_alive:
+                prey.evade()
             rate.sleep()
 
     except rospy.ROSInterruptException:
