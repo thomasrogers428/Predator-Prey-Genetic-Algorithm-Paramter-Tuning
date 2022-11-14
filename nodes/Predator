@@ -111,7 +111,6 @@ class Predator():
         return target 
 
     def run(self):
-        print("Running")
 
         while True:
 
@@ -166,18 +165,18 @@ class Predator():
             rot -= (2*math.pi)
 
         dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
-        print(self.x, self.y, self.theta)
-        print(rot, dist, (2*math.pi)-self.theta)
+        # print(self.x, self.y, self.theta)
+        # print(rot, dist, (2*math.pi)-self.theta)
         self.linear_velocity = 1
         self.angular_velocity = math.pi / 4
-        print("pre rotation: ", self.theta)
+        # print("pre rotation: ", self.theta)
         self.rotate_in_place(rot)
         rospy.sleep(2)
-        print("post rotation: ", self.theta)
+        # print("post rotation: ", self.theta)
         self.move_forward(dist)
         self.rotate_in_place((2*math.pi)-self.theta)
         
-        print("now at", self.x, self.y, self.theta)
+        # print("now at", self.x, self.y, self.theta)
         self.linear_velocity = 0
         self.angular_velocity = 0
 

@@ -91,7 +91,7 @@ class Prey():
         # print("In alive callback")
 
         if msg.robot_name == self.namespace:
-            # print("I'm alive!")
+            print(self.namespace, " alive!")
             self.is_alive = True
             self.linear_velocity = msg.linear_vel
             self.angular_velocity = msg.angular_vel
@@ -122,7 +122,7 @@ class Prey():
             rot -= (2*math.pi)
 
         if self.x != None:
-            print("prey about to move,", self.namespace)
+            # print("prey about to move,", self.namespace)
             self.linear_velocity = 1
             self.angular_velocity = math.pi /4
             self.rotate_in_place(rot)
