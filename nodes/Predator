@@ -33,6 +33,7 @@ LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 KILLED_THRESHOLD = 0.75
 
+NUM_PREY = 3 # Number of prey robots
 FREQUENCY = 10
 MAX_DIST = 1000
 
@@ -114,8 +115,9 @@ class Predator():
 
         while True:
 
-            if not self.hunting:
+            if not self.hunting or (len(self.preys) != NUM_PREY):
                 continue
+            
             target = self.find_target_prey()
 
             if not target:
@@ -124,10 +126,12 @@ class Predator():
             target_x, target_y = self.preys[target]
 
             if math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2) < KILLED_THRESHOLD:
-                self.kill_prey(target)
+                # self.kill_prey(target)
                 # Move away from killed bot
                 self.rotate_in_place(math.pi)
                 self.move_forward(1)
+                self.kill_prey(target)
+                rospy.sleep(2)
             
             else:
                 tan_angle = math.atan2(target_y - self.y, target_x - self.x)
@@ -153,15 +157,26 @@ class Predator():
     def _new_gen_callback(self, msg):
         # calls back all robot's to their initial pos
         self.hunting = False
+        rospy.sleep(2)
         rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
-        dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
-        print(rot, dist, -self.theta)
-        self.linear_velocity = 1
-        self.angular_velocity = 1
-        self.rotate_in_place(rot)
-        self.move_forward(dist)
-        self.rotate_in_place(-self.theta)
+        while rot < 0:
+            rot += (2*math.pi)
+        while rot > (2*math.pi):
+            rot -= (2*math.pi)
 
+        dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
+        print(self.x, self.y, self.theta)
+        print(rot, dist, (2*math.pi)-self.theta)
+        self.linear_velocity = 0.2
+        self.angular_velocity = math.pi / 4
+        print("pre rotation: ", self.theta)
+        self.rotate_in_place(rot)
+        rospy.sleep(2)
+        print("post rotation: ", self.theta)
+        self.move_forward(dist)
+        # self.rotate_in_place((2*math.pi)-self.theta)
+        
+        print("now at", self.x, self.y, self.theta)
         self.linear_velocity = 0
         self.angular_velocity = 0
 
