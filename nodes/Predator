@@ -9,7 +9,7 @@ import tf
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
 from nav_msgs.msg import Odometry # message type for odom
-
+from sensor_msgs.msg import LaserScan # message type for scan
 from ppgapt.msg import Registration_msg
 from ppgapt.msg import Kill_msg
 from ppgapt.msg import Alive_msg
@@ -22,6 +22,7 @@ from ppgapt.msg import Hunt_msg
 DEFAULT_PREDATOR_LINEAR_VELOCITY = 10 # m/s
 CUSTOM_KILL_TOPIC = '/kill'
 DEFAULT_ODOM_TOPIC = 'odom'
+DEFAULT_LASER_TOPIC = 'base_scan'
 DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
 DEFAULT_REGISTRATION_TOPIC = "/registration"
 DEFAULT_ALIVE_TOPIC = '/alive'
@@ -30,7 +31,7 @@ DEFAULT_READY_TOPIC = '/ready'
 DEFAULT_HUNT_TOPIC = '/hunt'
 
 LASER_ANGLE_FRONT = 0 # radians
-MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
+MIN_THRESHOLD_DISTANCE = 0.75 # m, threshold distance.
 KILLED_THRESHOLD = 0.75
 
 NUM_PREY = rospy.get_param("/num_prey") # Number of prey robots
@@ -46,7 +47,8 @@ class Predator():
         self.odom_dict = {}
 
         self.preys = {}
-        self.hunting = True
+        self.hunting = False
+        self._close_obstacle = False
 
         # pub/subs
         self._cmd_pub = rospy.Publisher(self.namespace + DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
@@ -56,7 +58,7 @@ class Predator():
 
         # create service for registration
         self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration_msg, self.registration_callback)
-
+        self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
         self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
         self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
         self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
@@ -66,18 +68,27 @@ class Predator():
         self.linear_velocity = 2 # m/s
         self.angular_velocity = math.pi/4 # rad/s
 
+        # Initialize current odometry
         self.x, self.y, self.theta = None, None, None
 
+        # Record start position and theta
         self.start_x, self.start_y =rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_param(self.namespace[:-1] + "_y")
+
+
 
     def registration_callback(self, msg):
         if msg.robotname.data not in self.preys:
             self.preys[msg.robotname.data] = (None,None)
 
-        rospy.Subscriber(msg.robotname.data + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
+            # Subscribe to each robots odometry
+            rospy.Subscriber(msg.robotname.data + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
 
     def _hunt_callback(self, msg):
-        self.hunting = True
+
+        if msg.hunt == True:
+            self.hunting = True
+        if msg.hunt == False:
+            self.hunting = False
 
     def location_callback(self, msg, args):
         self.preys[args] = (msg.pose.pose.position.x, msg.pose.pose.position.y)
@@ -123,6 +134,13 @@ class Predator():
                 continue
 
             target_x, target_y = self.preys[target]
+
+            if self._close_obstacle:
+                self.stop()
+                self.rotate_in_place(math.pi/2)
+                self.move_forward(0.5)
+                rospy.sleep(2)
+
 
             if math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2) < KILLED_THRESHOLD:
                 # self.kill_prey(target)

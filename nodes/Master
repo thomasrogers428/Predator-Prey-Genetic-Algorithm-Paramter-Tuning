@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import math
+import time
 
 # import of relevant libraries.
 import rospy # module for ROS APIs
@@ -27,6 +28,7 @@ MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 NUM_PREY_BOTS = rospy.get_param("/num_prey") # Number of prey bots
 NUM_PREDATOR_BOTS = rospy.get_param("/num_predators") # Number of predator bots
 KILLED_THRESHOLD = rospy.get_param("/killed_threshold") # Once this many bots are killed, a new generation is spawned
+NUM_GENERATIONS_THRESHOLD = 4 # Once this many generations are spawned, the robots all stop
 
 MIN_LINEAR_VEL = 0.05 # m/s
 MAX_LINEAR_VEL = 2.00 # m/s
@@ -43,6 +45,7 @@ class Master():
         self.num_killed_threshold = KILLED_THRESHOLD
         self.generation_count = 0
         self.first_gen_spawned = False
+        self.last_time = None
 
         self.ready = False
         self.num_ready = 0
@@ -87,83 +90,111 @@ class Master():
 
             # Publish alive message
             self._alive_pub.publish(alive)
+            rospy.sleep(2)
+
+        # Tell predators it's time to start hunting
+        hunt = Hunt_msg()
+        hunt.hunt = True
+        self._hunt_pub.publish(hunt)
+
+        # Take initial time stamp when first generation starts
+        self.last_time = time.time()
 
 
     # A function to spawn the next generation of prey robots
     def new_gen(self):
         
         self.num_ready = 0
-        # Publish message to allocate predator/prey to waypoints
-        new_gen = New_gen_msg()
-        new_gen.new_gen = True
-        self._new_gen_pub.publish(new_gen)
+        self.generation_count += 1
 
-        # print("entering infinite loop")
-        # while True:
-        #     continue
+        if self.generation_count >= NUM_GENERATIONS_THRESHOLD:
 
-        # While loop to ensure all bots are at their waypoints before next round starts
-        while self.ready == False:
-            rospy.sleep(2)
+            # Tell predators to stop hunting
+            hunt = Hunt_msg()
+            hunt.hunt = False
+            self._hunt_pub.publish(hunt)
 
-        # Reset number of ready bots
-        self.ready = False
+            # Tell prey to die
+        else:
+            # Publish message to allocate predator/prey to waypoints
+            new_gen = New_gen_msg()
+            new_gen.new_gen = True
+            self._new_gen_pub.publish(new_gen)
 
+            # print("entering infinite loop")
+            # while True:
+            #     continue
 
+            # While loop to ensure all bots are at their waypoints before next round starts
+            while self.ready == False:
+                rospy.sleep(2)
 
-        # Tell predators to start hunting again
-        hunt = Hunt_msg()
-        self._hunt_pub.publish(hunt)
+            # Reset number of ready bots
+            self.ready = False
 
-        print("alive: ", self.alive.keys())
-        print("dead: ", self.dead)
+            print("alive: ", self.alive.keys())
+            print("dead: ", self.dead)
 
-        # For each dead bot, generate new params and send alive message
-        for bot in self.prey:
-            print("re-aliving", bot)
-            
-            if bot in self.dead:
-                alive_bots = len(self.alive.keys())
+            # For each dead bot, generate new params and send alive message
+            for bot in self.prey:
+                print("re-aliving", bot)
+                
+                if bot in self.dead:
+                    alive_bots = len(self.alive.keys())
 
-                first = random.randint(0, alive_bots)
-                second = random.randint(0, alive_bots)
+                    first = random.randint(0, alive_bots)
+                    second = random.randint(0, alive_bots)
 
-                # Ensure two different parent bots
-                # while second == first:
-                #     second = random.randint(0, alive_bots)
+                    # Ensure two different parent bots
+                    # while second == first:
+                    #     second = random.randint(0, alive_bots)
 
-                # first_parent = list(self.alive.keys())[first]
-                # second_parent = list(self.alive.keys())[second]
+                    # first_parent = list(self.alive.keys())[first]
+                    # second_parent = list(self.alive.keys())[second]
 
-                first_parent = random.choice(list(self.alive.keys()))
-                second_parent = random.choice(list(self.alive.keys()))
+                    first_parent = random.choice(list(self.alive.keys()))
+                    second_parent = random.choice(list(self.alive.keys()))
 
-                new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
-                new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
+                    new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
+                    new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
 
-                # Construct alive message
-                alive = Alive_msg()
-                alive.robot_name = bot
-                alive.linear_vel = new_linear
-                alive.angular_vel = new_angular
+                    # Mutation opportunity
+                    if random.randint(0, 1) == 1:
+                        print("Mutating")
+                        new_linear += 0.15
+                        print("new velocity is", new_linear)
 
-                # Update alive robot dictionary
-                self.alive[bot] = (new_linear, new_angular)
+                    # Construct alive message
+                    alive = Alive_msg()
+                    alive.robot_name = bot
+                    alive.linear_vel = new_linear
+                    alive.angular_vel = new_angular
 
-                # Publish alive message
-                self._alive_pub.publish(alive)
+                    # Update alive robot dictionary
+                    self.alive[bot] = (new_linear, new_angular)
 
-                # Remove dead_bot from dead list
-                self.dead.remove(bot)
-            
-            else:
-                # Construct alive message
-                alive = Alive_msg()
-                alive.robot_name = bot
-                alive.linear_vel = self.alive[bot][0]
-                alive.angular_vel = self.alive[bot][1]
+                    # Publish alive message
+                    self._alive_pub.publish(alive)
 
-                self._alive_pub.publish(alive)
+                    # Remove dead_bot from dead list
+                    self.dead.remove(bot)
+                
+                else:
+                    # Construct alive message
+                    alive = Alive_msg()
+                    alive.robot_name = bot
+                    alive.linear_vel = self.alive[bot][0]
+                    alive.angular_vel = self.alive[bot][1]
+
+                    self._alive_pub.publish(alive)
+            rospy.sleep(4)
+            # Tell predators to start hunting again
+            hunt = Hunt_msg()
+            hunt.hunt = True
+            self._hunt_pub.publish(hunt)
+
+            # Reset starting val
+            self.last_time = time.time()
 
 
     
@@ -206,6 +237,14 @@ class Master():
         rospy.sleep(5)
         # If threshold met, start new generation
         if self.num_killed == self.num_killed_threshold:
+
+            # Tell predators to stop hunting
+            hunt = Hunt_msg()
+            hunt.hunt = False
+            self._hunt_pub.publish(hunt)
+
+            # Grab generation time
+            print("Generation " + str(self.generation_count) + ": " + str(time.time() - self.last_time))
             print("spawning new generation")
             self.new_gen()
             self.num_killed = 0
