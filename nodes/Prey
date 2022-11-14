@@ -123,12 +123,12 @@ class Prey():
 
         if self.x != None:
             print("prey about to move,", self.namespace)
-            self.linear_velocity = 0.2
+            self.linear_velocity = 1
             self.angular_velocity = math.pi /4
             self.rotate_in_place(rot)
             rospy.sleep(2)
             self.move_forward(dist)
-            # self.rotate_in_place(-self.theta)
+            self.rotate_in_place((2*math.pi)-self.theta)
     
         self.linear_velocity = 0
         self.angular_velocity = 0

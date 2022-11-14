@@ -193,6 +193,7 @@ class Master():
             self.num_killed += 1
             print("Kill occured")
 
+        rospy.sleep(5)
         # If threshold met, start new generation
         if self.num_killed == self.num_killed_threshold:
             print("spawning new generation")
