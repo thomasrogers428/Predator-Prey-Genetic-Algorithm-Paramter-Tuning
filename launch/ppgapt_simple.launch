@@ -3,6 +3,10 @@
   <arg name="use_sim_time" default="true"/>
   <param name="use_sim_time" value="$(arg use_sim_time)"/>
 
+  <param name="num_prey" value="3"/>
+  <param name="num_predators" value="1"/>
+  <param name="killed_threshold" value="2"/>
+
   <param name="robot_0_x" value="0"/>
   <param name="robot_0_y" value="0"/>
   <param name="robot_1_x" value="0"/>

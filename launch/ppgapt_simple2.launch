@@ -1,5 +1,9 @@
 <launch>
 
+  <param name="num_prey" value="1"/>
+  <param name="num_predators" value="1"/>
+  <param name="killed_threshold" value="1"/>
+
   <arg name="use_sim_time" default="true"/>
   <param name="use_sim_time" value="$(arg use_sim_time)"/>
 
@@ -11,6 +15,7 @@
   <param name="robot_0" value="robot_0"/>
   <param name="robot_1" value="robot_1"/>
 
+  <node pkg="ppgapt" type="Master" name="Master" output="screen"/>
 
   <group ns="robot_0">
     <node pkg="ppgapt" type="Predator" name="Predator" output="screen"/>

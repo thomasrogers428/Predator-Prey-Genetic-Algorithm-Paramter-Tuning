@@ -36,7 +36,6 @@ add_message_files(
   Ready_msg.msg
   Registration_msg.msg
   Hunt_msg.msg
-
 )
 
 
