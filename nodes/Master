@@ -265,15 +265,14 @@ def main():
     # # If interrupted, send a stop command.
     # rospy.on_shutdown(master.stop)
 
-    # Update velocities
-    # try:
-    #     rate = rospy.Rate(freq)
+    try:
+        rate = rospy.Rate(freq)
 
-    #     while not rospy.is_shutdown():
-    #         rate.sleep()
+        while not rospy.is_shutdown():
+            rate.sleep()
 
-    # except rospy.ROSInterruptException:
-    #     rospy.logerr("ROS node interrupted.")
+    except rospy.ROSInterruptException:
+        rospy.logerr("ROS node interrupted.")
 
     rospy.spin()
 
