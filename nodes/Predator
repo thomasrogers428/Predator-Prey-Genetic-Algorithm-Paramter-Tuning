@@ -29,7 +29,7 @@ DEFAULT_READY_TOPIC = '/ready'
 
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
-KILLED_THRESHOLD = .5
+KILLED_THRESHOLD = 0.5
 
 FREQUENCY = 10
 MAX_DIST = 1000
@@ -114,15 +114,19 @@ class Predator():
 
             if math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2) < KILLED_THRESHOLD:
                 self.kill_prey(target)
+                # Move away from killed bot
+                self.rotate_in_place(math.pi)
+                self.move_forward(1)
+            
+            else:
+                tan_angle = math.atan2(target_y - self.y, target_x - self.x)
 
-            tan_angle = math.atan2(target_y - self.y, target_x - self.x)
+                angle = tan_angle - self.theta
 
-            angle = tan_angle - self.theta
-
-            twist_msg = Twist()
-            twist_msg.angular.z = angle
-            twist_msg.linear.x = DEFAULT_PREDATOR_LINEAR_VELOCITY
-            self._cmd_pub.publish(twist_msg)
+                twist_msg = Twist()
+                twist_msg.angular.z = angle
+                twist_msg.linear.x = DEFAULT_PREDATOR_LINEAR_VELOCITY
+                self._cmd_pub.publish(twist_msg)
 
     def kill_prey(self, target):
 
