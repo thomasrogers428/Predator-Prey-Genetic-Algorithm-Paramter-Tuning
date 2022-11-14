@@ -15,6 +15,7 @@ from ppgapt.msg import Kill_msg
 from ppgapt.msg import Alive_msg
 from ppgapt.msg import New_gen_msg
 from ppgapt.msg import Ready_msg
+from ppgapt.msg import Hunt_msg
 
 
 # Constants.
@@ -26,10 +27,11 @@ DEFAULT_REGISTRATION_TOPIC = "/registration"
 DEFAULT_ALIVE_TOPIC = '/alive'
 DEFAULT_NEW_GENERATION_TOPIC = '/new_gen'
 DEFAULT_READY_TOPIC = '/ready'
+DEFAULT_HUNT_TOPIC = '/hunt'
 
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
-KILLED_THRESHOLD = 0.5
+KILLED_THRESHOLD = 0.75
 
 FREQUENCY = 10
 MAX_DIST = 1000
@@ -43,6 +45,7 @@ class Predator():
         self.odom_dict = {}
 
         self.preys = {}
+        self.hunting = True
 
         # pub/subs
         self._cmd_pub = rospy.Publisher(self.namespace + DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
@@ -56,6 +59,7 @@ class Predator():
         self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
         self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
         self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
+        self._hunt_sub = rospy.Subscriber(DEFAULT_HUNT_TOPIC, Hunt_msg, self._hunt_callback, queue_size=1)
 
         # vel values
         self.linear_velocity = 2 # m/s
@@ -70,6 +74,9 @@ class Predator():
             self.preys[msg.robotname.data] = (None,None)
 
         rospy.Subscriber(msg.robotname.data + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
+
+    def _hunt_callback(self, msg):
+        self.hunting = True
 
     def location_callback(self, msg, args):
         self.preys[args] = (msg.pose.pose.position.x, msg.pose.pose.position.y)
@@ -104,7 +111,11 @@ class Predator():
 
     def run(self):
         print("Running")
+
         while True:
+
+            if not self.hunting:
+                continue
             target = self.find_target_prey()
 
             if not target:
@@ -141,6 +152,7 @@ class Predator():
 
     def _new_gen_callback(self, msg):
         # calls back all robot's to their initial pos
+        self.hunting = False
         rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
         dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
         print(rot, dist, -self.theta)
@@ -157,6 +169,7 @@ class Predator():
         ready_msg.ready = True
 
         self._ready_pub_.publish(ready_msg)
+        
 
     def move_forward(self, distance):
 
