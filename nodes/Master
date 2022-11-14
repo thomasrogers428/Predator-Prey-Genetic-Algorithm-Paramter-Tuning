@@ -68,10 +68,7 @@ class Master():
     # A function to spawn the first generation of predator and prey robots
     def spawn_first_gen(self):
 
-        print("spawning first gen")
-
         for prey in self.prey:
-            print("adding prey", prey)
             
             # Generate random velocities
             velocities = self.genetic_velocities()
@@ -101,9 +98,9 @@ class Master():
         new_gen.new_gen = True
         self._new_gen_pub.publish(new_gen)
 
-        print("entering infinite loop")
-        while True:
-            continue
+        # print("entering infinite loop")
+        # while True:
+        #     continue
 
         # While loop to ensure all bots are at their waypoints before next round starts
         while self.ready == False:
@@ -118,43 +115,56 @@ class Master():
         hunt = Hunt_msg()
         self._hunt_pub.publish(hunt)
 
-
+        print("alive: ", self.alive.keys())
+        print("dead: ", self.dead)
 
         # For each dead bot, generate new params and send alive message
-        for dead_bot in self.dead:
+        for bot in self.prey:
+            print("re-aliving", bot)
+            
+            if bot in self.dead:
+                alive_bots = len(self.alive.keys())
 
-            alive_bots = len(self.alive.keys())
-
-            first = random.randint(0, alive_bots)
-            second = random.randint(0, alive_bots)
-
-            # Ensure two different parent bots
-            while second == first:
+                first = random.randint(0, alive_bots)
                 second = random.randint(0, alive_bots)
 
-            # first_parent = list(self.alive.keys())[first]
-            # second_parent = list(self.alive.keys())[second]
+                # Ensure two different parent bots
+                # while second == first:
+                #     second = random.randint(0, alive_bots)
 
-            first_parent = random.choice(list(self.alive.keys()))
-            second_parent = random.choice(list(self.alive.keys()))
+                # first_parent = list(self.alive.keys())[first]
+                # second_parent = list(self.alive.keys())[second]
 
-            new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
-            new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
+                first_parent = random.choice(list(self.alive.keys()))
+                second_parent = random.choice(list(self.alive.keys()))
 
-            # Construct alive message
-            alive = Alive_msg()
-            alive.robot_name = dead_bot
-            alive.linear_vel = new_linear
-            alive.angular_vel = new_angular
+                new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
+                new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
 
-            # Update alive robot dictionary
-            self.alive[dead_bot] = (new_linear, new_angular)
+                # Construct alive message
+                alive = Alive_msg()
+                alive.robot_name = bot
+                alive.linear_vel = new_linear
+                alive.angular_vel = new_angular
 
-            # Publish alive message
-            self._alive_pub.publish(alive)
+                # Update alive robot dictionary
+                self.alive[bot] = (new_linear, new_angular)
 
-            # Remove dead_bot from dead list
-            self.dead.remove(dead_bot)
+                # Publish alive message
+                self._alive_pub.publish(alive)
+
+                # Remove dead_bot from dead list
+                self.dead.remove(bot)
+            
+            else:
+                # Construct alive message
+                alive = Alive_msg()
+                alive.robot_name = bot
+                alive.linear_vel = self.alive[bot][0]
+                alive.angular_vel = self.alive[bot][1]
+
+                self._alive_pub.publish(alive)
+
 
     
 
