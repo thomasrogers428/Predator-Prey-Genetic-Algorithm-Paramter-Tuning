@@ -210,6 +210,8 @@ class Prey():
         twist_msg = Twist()
         self._cmd_pub.publish(twist_msg)
 
+
+
     def _laser_callback(self, msg):
         """Processing of laser message."""
         # Access to the index of the measurement in front of the robot.
@@ -240,8 +242,7 @@ def main():
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
-    # # If interrupted, send a stop command.
-    prey.stop()
+    rospy.on_shutdown(prey.stop)
 
     # Update velocities
     try:
