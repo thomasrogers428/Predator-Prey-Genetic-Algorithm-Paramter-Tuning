@@ -32,7 +32,7 @@ turtlebot
 (
   pose [ 0.0 0.0 0.0 0.0 ]
   name "turtlebot"
-  color "black"
+  color "red"
 )
 
 turtlebot
