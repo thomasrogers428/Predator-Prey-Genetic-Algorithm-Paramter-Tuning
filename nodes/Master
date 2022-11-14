@@ -28,7 +28,7 @@ MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 NUM_PREY_BOTS = rospy.get_param("/num_prey") # Number of prey bots
 NUM_PREDATOR_BOTS = rospy.get_param("/num_predators") # Number of predator bots
 KILLED_THRESHOLD = rospy.get_param("/killed_threshold") # Once this many bots are killed, a new generation is spawned
-NUM_GENERATIONS_THRESHOLD = 4 # Once this many generations are spawned, the robots all stop
+NUM_GENERATIONS_THRESHOLD = 5 # Once this many generations are spawned, the robots all stop
 
 MIN_LINEAR_VEL = 0.05 # m/s
 MAX_LINEAR_VEL = 2.00 # m/s
@@ -56,14 +56,14 @@ class Master():
         self.dead = []
 
         # Custom message publisher
-        self._alive_pub = rospy.Publisher("/alive", Alive_msg, queue_size=1)
+        self._alive_pub = rospy.Publisher("/alive", Alive_msg, queue_size=10)
         self._new_gen_pub = rospy.Publisher("/new_gen", New_gen_msg, queue_size=1)
         self._hunt_pub = rospy.Publisher("/hunt", Hunt_msg, queue_size=1)
 
         # Set up subscribers
         self._registration_sub = rospy.Subscriber("/registration", Registration_msg, self.registration_callback)
         self._ready_sub = rospy.Subscriber("/ready", Ready_msg, self.ready_callback)
-        self._kill_sub = rospy.Subscriber("/kill", Kill_msg, self.kill_callback)
+        self._kill_sub = rospy.Subscriber("/kill", Kill_msg, self.kill_callback, queue_size=10)
 
 
     # A function to spawn the first generation of predator and prey robots

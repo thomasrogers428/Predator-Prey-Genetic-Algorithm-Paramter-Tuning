@@ -69,9 +69,9 @@ class Prey():
         
         # Set up subscribers
         self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
-        self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
+        self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=10)
         self._odom_sub = rospy.Subscriber(odom_topic, Odometry, self._odom_callback, queue_size=1)
-        self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill_msg, self._kill_callback, queue_size=1)
+        self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill_msg, self._kill_callback, queue_size=10)
         self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
 
     # method to avoid predators using separation
@@ -85,7 +85,7 @@ class Prey():
         # if still moving, and a new generation has not begun, randomly walk
         if self.angular_velocity != 0 and self.linear_velocity != 0 and not self.new_gen:
             self.rotate_in_place(random.uniform(0, 2*math.pi))
-            self.move_forward(random.uniform(1, 3))
+            self.move_forward(random.uniform(2, 6))
     
     # CALLBACK FUNCTIONS
 

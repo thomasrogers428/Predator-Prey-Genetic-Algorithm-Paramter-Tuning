@@ -52,7 +52,7 @@ class Predator():
 
         # pub/subs
         self._cmd_pub = rospy.Publisher(self.namespace + DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
-        self._kill_pub = rospy.Publisher(CUSTOM_KILL_TOPIC, Kill_msg, queue_size=1)
+        self._kill_pub = rospy.Publisher(CUSTOM_KILL_TOPIC, Kill_msg, queue_size=10)
         self._odom_pub_ = rospy.Publisher(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, queue_size=1)
         self._ready_pub_ = rospy.Publisher(DEFAULT_READY_TOPIC, Ready_msg, queue_size=1)
 
@@ -60,7 +60,7 @@ class Predator():
         self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration_msg, self.registration_callback)
         self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
         self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
-        self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
+        self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=10)
         self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
         self._hunt_sub = rospy.Subscriber(DEFAULT_HUNT_TOPIC, Hunt_msg, self._hunt_callback, queue_size=1)
 
@@ -145,13 +145,6 @@ class Predator():
 
             target_x, target_y = self.preys[target]
 
-            # Obstacle avoidance
-            if self._close_obstacle:
-                self.stop()
-                self.rotate_in_place(math.pi/2)
-                self.move_forward(0.5)
-                rospy.sleep(1)
-
             # Kill case
             if math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2) < KILLED_THRESHOLD:
                 # Move away from killed bot
@@ -159,7 +152,14 @@ class Predator():
                 self.rotate_in_place(math.pi)
                 self.move_forward(1)
                 rospy.sleep(.2)
-            
+
+            # Obstacle avoidance
+            if self._close_obstacle:
+                self.stop()
+                self.rotate_in_place(math.pi/2)
+                self.move_forward(0.5)
+                rospy.sleep(1)
+
             # Move towards target
             else:
                 tan_angle = math.atan2(target_y - self.y, target_x - self.x)
