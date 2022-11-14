@@ -13,6 +13,7 @@ from sensor_msgs.msg import LaserScan # message type for scan
 from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
 
+# Custom messages
 from ppgapt.msg import Registration_msg
 from ppgapt.msg import Alive_msg
 from ppgapt.msg import Kill_msg
@@ -26,7 +27,6 @@ LASER_ANGLE_FRONT = 0 # radians
 LINEAR_VELOCITY = 0.2 # m/s
 ANGULAR_VELOCITY = math.pi/4 # rad/s
 MIN_THRESHOLD_DISTANCE = 1.5 # m, threshold distance.
-
 MIN_LINEAR_VEL = 0.05 # m/s
 MAX_LINEAR_VEL = 2.00 # m/s
 MIN_ANGULAR_VEL = math.pi/8 # rad/s
@@ -45,16 +45,14 @@ DEFAULT_READY_TOPIC = '/ready'
 class Prey():
     def __init__(self):
 
-        # velocities = self.genetic_velocities()
+        # Parameters and variables
         self.angular_velocity = 0
         self.linear_velocity = 0
         self.namespace = rospy.get_namespace()
         self._close_obstacle = None
         self.new_gen = False
-
         self.start_x, self.start_y = rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_param(self.namespace[:-1] + "_y")
         self.x, self.y, self.theta = None, None, None
-
         self.is_alive = True
         self.odom_dict = {}
 
@@ -78,28 +76,32 @@ class Prey():
 
     # method to avoid predators using separation
     def evade(self):
+        # if alive, register yourself to the predator and master nodes
         if self.is_alive:
             registration_msg = Registration_msg()
             registration_msg.robotname.data = self.namespace
             self._registration_pub.publish(registration_msg)
 
+        # if still moving, and a new generation has not begun, randomly walk
         if self.angular_velocity != 0 and self.linear_velocity != 0 and not self.new_gen:
             self.rotate_in_place(random.uniform(0, 2*math.pi))
             self.move_forward(random.uniform(1, 3))
-        
-    def _is_alive_callback(self, msg):
-        # print("In alive callback")
+    
+    # CALLBACK FUNCTIONS
 
+    # sets alive variable to true and sets linear and angular velocity    
+    def _is_alive_callback(self, msg):
         if msg.robot_name == self.namespace:
             print(self.namespace, " alive!")
             self.is_alive = True
             self.linear_velocity = msg.linear_vel
             self.angular_velocity = msg.angular_vel
 
+    # extract position and rotation from odom message
     def _odom_callback(self, msg):
         self.x, self.y, self.theta = msg.pose.pose.position.x, msg.pose.pose.position.y, tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])[2]
 
-    
+    # if killed, stop and set alive to False
     def _kill_callback(self, msg):
         if msg.robot_name == self.namespace:
             print(msg.robot_name + "killed")
@@ -108,6 +110,7 @@ class Prey():
             self.angular_velocity = 0
             self.linear_velocity = 0
 
+    # method for handling starting the next generation of robots
     def _new_gen_callback(self, msg):
 
         self.new_gen = True
@@ -116,13 +119,14 @@ class Prey():
         rot = math.atan2(self.start_y - self.y, self.start_x - self.x) - self.theta
         dist = math.sqrt((self.x - self.start_x)**2 + (self.y - self.start_y)**2)
 
+        # clamp rotation angle to between 0 and 2pi
         while rot < 0:
             rot += (2*math.pi)
         while rot > (2*math.pi):
             rot -= (2*math.pi)
 
+        # drive back to the waypoint
         if self.x != None:
-            # print("prey about to move,", self.namespace)
             self.linear_velocity = 1
             self.angular_velocity = math.pi /4
             self.rotate_in_place(rot)
@@ -136,6 +140,7 @@ class Prey():
         ready_msg = Ready_msg()
         ready_msg.ready = True
 
+        # publish that the current robot is ready
         self._ready_pub_.publish(ready_msg)
         self.new_gen = False
 
@@ -217,19 +222,6 @@ class Prey():
             self._close_obstacle = False
 
 
-    # A function to randomly generate linked traits 
-    # def genetic_velocities(self):
-
-    #     speed_percentage = random.uniform(0, 1)
-    #     speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
-
-    #     angular_percentage = 1 - speed_percentage
-    #     angular = MIN_ANGULAR_VEL + (angular_percentage * (MAX_ANGULAR_VEL-MIN_ANGULAR_VEL))
-
-    #     return (angular, speed)
-
-
-
 def main():
     """Main function."""
 
@@ -242,19 +234,14 @@ def main():
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
-    # Initialization of the class for the flocking motion.
+    # Initialization of the class for the predator evasion motion
     prey = Prey()
-
-    # registration_msg = Registration_msg()
-    # registration_msg.robotname.data = prey.namespace
-    # prey._registration_pub.publish(registration_msg)
 
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
     # # If interrupted, send a stop command.
-    # rospy.on_shutdown(stop(prey._cmd_pub))
-
+    prey.stop()
 
     # Update velocities
     try:
@@ -263,6 +250,7 @@ def main():
         while not rospy.is_shutdown():
             if prey.is_alive:
                 prey.evade()
+
             rate.sleep()
 
     except rospy.ROSInterruptException:

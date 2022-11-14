@@ -14,6 +14,7 @@ from sensor_msgs.msg import LaserScan # message type for scan
 from nav_msgs.msg import Odometry # message type for odom
 from turtlesim.msg import Pose
 
+# Custom messages
 from ppgapt.msg import Registration_msg
 from ppgapt.msg import Kill_msg
 from ppgapt.msg import Alive_msg
@@ -21,10 +22,9 @@ from ppgapt.msg import New_gen_msg
 from ppgapt.msg import Ready_msg
 from ppgapt.msg import Hunt_msg
 
-
+# Constants
 LASER_ANGLE_FRONT = 0 # radians
 MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
-# Constants
 NUM_PREY_BOTS = rospy.get_param("/num_prey") # Number of prey bots
 NUM_PREDATOR_BOTS = rospy.get_param("/num_predators") # Number of predator bots
 KILLED_THRESHOLD = rospy.get_param("/killed_threshold") # Once this many bots are killed, a new generation is spawned
@@ -39,6 +39,7 @@ MAX_ANGULAR_VEL = math.pi # rad/s
 class Master():
     def __init__(self):
 
+        # Variables
         self.num_prey_bots = NUM_PREY_BOTS
         self.num_predator_bots = NUM_PREDATOR_BOTS
         self.num_killed = 0
@@ -60,11 +61,8 @@ class Master():
         self._hunt_pub = rospy.Publisher("/hunt", Hunt_msg, queue_size=1)
 
         # Set up subscribers
-        # create service for registration
         self._registration_sub = rospy.Subscriber("/registration", Registration_msg, self.registration_callback)
         self._ready_sub = rospy.Subscriber("/ready", Ready_msg, self.ready_callback)
-
-        # create kill message subscriber
         self._kill_sub = rospy.Subscriber("/kill", Kill_msg, self.kill_callback)
 
 
@@ -121,10 +119,6 @@ class Master():
             new_gen.new_gen = True
             self._new_gen_pub.publish(new_gen)
 
-            # print("entering infinite loop")
-            # while True:
-            #     continue
-
             # While loop to ensure all bots are at their waypoints before next round starts
             while self.ready == False:
                 rospy.sleep(2)
@@ -132,12 +126,8 @@ class Master():
             # Reset number of ready bots
             self.ready = False
 
-            print("alive: ", self.alive.keys())
-            print("dead: ", self.dead)
-
             # For each dead bot, generate new params and send alive message
             for bot in self.prey:
-                print("re-aliving", bot)
                 
                 if bot in self.dead:
                     alive_bots = len(self.alive.keys())
@@ -145,16 +135,11 @@ class Master():
                     first = random.randint(0, alive_bots)
                     second = random.randint(0, alive_bots)
 
-                    # Ensure two different parent bots
-                    # while second == first:
-                    #     second = random.randint(0, alive_bots)
-
-                    # first_parent = list(self.alive.keys())[first]
-                    # second_parent = list(self.alive.keys())[second]
-
+                    # Ensure two random parent bots
                     first_parent = random.choice(list(self.alive.keys()))
                     second_parent = random.choice(list(self.alive.keys()))
 
+                    # average values of parents
                     new_linear = (self.alive[first_parent][0] + self.alive[second_parent][0]) / 2
                     new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
 
@@ -271,7 +256,7 @@ def main():
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
 
-    # Initialization of the class for the flocking motion.
+    # Initialization of the class
     master = Master()
 
     # Sleep for a few seconds to wait for the registration.
