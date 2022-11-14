@@ -58,7 +58,6 @@ class Predator():
 
         # create service for registration
         self._registration_sub = rospy.Subscriber(DEFAULT_REGISTRATION_TOPIC, Registration_msg, self.registration_callback)
-
         self._laser_sub = rospy.Subscriber(DEFAULT_LASER_TOPIC, LaserScan, self._laser_callback, queue_size=1)
         self._odom_sub = rospy.Subscriber(self.namespace + DEFAULT_ODOM_TOPIC, Odometry, self.odom_callback)
         self._is_alive_sub = rospy.Subscriber(DEFAULT_ALIVE_TOPIC, Alive_msg, self._is_alive_callback, queue_size=1)
@@ -69,15 +68,20 @@ class Predator():
         self.linear_velocity = 2 # m/s
         self.angular_velocity = math.pi/4 # rad/s
 
+        # Initialize current odometry
         self.x, self.y, self.theta = None, None, None
 
+        # Record start position and theta
         self.start_x, self.start_y =rospy.get_param(self.namespace[:-1] + "_x"), rospy.get_param(self.namespace[:-1] + "_y")
+
+
 
     def registration_callback(self, msg):
         if msg.robotname.data not in self.preys:
             self.preys[msg.robotname.data] = (None,None)
 
-        rospy.Subscriber(msg.robotname.data + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
+            # Subscribe to each robots odometry
+            rospy.Subscriber(msg.robotname.data + DEFAULT_ODOM_TOPIC, Odometry, self.location_callback, (msg.robotname.data))
 
     def _hunt_callback(self, msg):
 
