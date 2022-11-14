@@ -35,6 +35,8 @@ add_message_files(
   New_gen_msg.msg
   Ready_msg.msg
   Registration_msg.msg
+  Hunt_msg.msg
+
 )
 
 

@@ -18,6 +18,7 @@ from ppgapt.msg import Kill_msg
 from ppgapt.msg import Alive_msg
 from ppgapt.msg import New_gen_msg
 from ppgapt.msg import Ready_msg
+from ppgapt.msg import Hunt_msg
 
 
 LASER_ANGLE_FRONT = 0 # radians
@@ -25,7 +26,7 @@ MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 # Constants
 NUM_PREY_BOTS = 3 # Number of prey bots
 NUM_PREDATOR_BOTS = 1 # Number of predator bots
-KILLED_THRESHOLD = 2 # Once 4 bots are killed, a new generation is spawned
+KILLED_THRESHOLD = 2 # Once this many bots are killed, a new generation is spawned
 
 MIN_LINEAR_VEL = 0.05 # m/s
 MAX_LINEAR_VEL = 2.00 # m/s
@@ -53,6 +54,7 @@ class Master():
         # Custom message publisher
         self._alive_pub = rospy.Publisher("/alive", Alive_msg, queue_size=1)
         self._new_gen_pub = rospy.Publisher("/new_gen", New_gen_msg, queue_size=1)
+        self._hunt_pub = rospy.Publisher("/hunt", Hunt_msg, queue_size=1)
 
         # Set up subscribers
         # create service for registration
@@ -99,12 +101,23 @@ class Master():
         new_gen.new_gen = True
         self._new_gen_pub.publish(new_gen)
 
+        print("entering infinite loop")
+        while True:
+            continue
+
         # While loop to ensure all bots are at their waypoints before next round starts
         while self.ready == False:
             rospy.sleep(2)
 
         # Reset number of ready bots
         self.ready = False
+
+
+
+        # Tell predators to start hunting again
+        hunt = Hunt_msg()
+        self._hunt_pub.publish(hunt)
+
 
 
         # For each dead bot, generate new params and send alive message
@@ -148,7 +161,7 @@ class Master():
     # A function to randomly generate linked velocity traits 
     def genetic_velocities(self):
 
-        speed_percentage = random.uniform(0, 1)
+        speed_percentage = random.uniform(0.1, 1)
         speed = MIN_LINEAR_VEL + (speed_percentage * (MAX_LINEAR_VEL-MIN_LINEAR_VEL))
 
         angular_percentage = 1 - speed_percentage
