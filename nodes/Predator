@@ -89,10 +89,14 @@ class Predator():
 
     # Callback function to set whether predator should be hunting or not
     def _hunt_callback(self, msg):
+        print("In hunt callback")
         if msg.hunt == True:
             self.hunting = True
         if msg.hunt == False:
+            print("hunt message was false")
             self.hunting = False
+            self.linear_velocity = 0
+            self.angular_velocity = 0
 
     # Callback to set current predators position
     def odom_callback(self, msg):
@@ -139,7 +143,7 @@ class Predator():
                 continue
             
             target = self.find_target_prey()
-
+            
             if not target:
                 continue
 
@@ -161,7 +165,7 @@ class Predator():
                 rospy.sleep(1)
 
             # Move towards target
-            else:
+            elif self.hunting:
                 tan_angle = math.atan2(target_y - self.y, target_x - self.x)
                 angle = tan_angle - self.theta
 
