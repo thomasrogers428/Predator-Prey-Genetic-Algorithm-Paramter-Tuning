@@ -113,6 +113,17 @@ class Master():
             hunt.hunt = False
             self._hunt_pub.publish(hunt)
 
+            for alive_bot in self.alive:
+                # Construct alive message to simulate death for end of simulation
+                    alive = Alive_msg()
+                    alive.robot_name = alive_bot
+                    alive.linear_vel = 0
+                    alive.angular_vel = 0
+
+                    # Publish alive message
+                    self._alive_pub.publish(alive)
+
+
             # Tell prey to die
         else:
             # Publish message to allocate predator/prey to waypoints
