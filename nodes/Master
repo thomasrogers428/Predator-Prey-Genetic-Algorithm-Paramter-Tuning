@@ -28,7 +28,7 @@ MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 NUM_PREY_BOTS = rospy.get_param("/num_prey") # Number of prey bots
 NUM_PREDATOR_BOTS = rospy.get_param("/num_predators") # Number of predator bots
 KILLED_THRESHOLD = rospy.get_param("/killed_threshold") # Once this many bots are killed, a new generation is spawned
-NUM_GENERATIONS_THRESHOLD = 5 # Once this many generations are spawned, the robots all stop
+NUM_GENERATIONS_THRESHOLD = 4 # Once this many generations are spawned, the robots all stop
 
 MIN_LINEAR_VEL = 0.05 # m/s
 MAX_LINEAR_VEL = 2.00 # m/s
@@ -82,7 +82,6 @@ class Master():
             alive.linear_vel = linear
             alive.angular_vel = angular
 
-
             # Update alive robot dictionary
             self.alive[prey] = (linear, angular)
 
@@ -108,9 +107,21 @@ class Master():
         if self.generation_count >= NUM_GENERATIONS_THRESHOLD:
 
             # Tell predators to stop hunting
+            print("Generation threshold met")
             hunt = Hunt_msg()
             hunt.hunt = False
             self._hunt_pub.publish(hunt)
+
+            for alive_bot in self.alive:
+                # Construct alive message to simulate death for end of simulation
+                    alive = Alive_msg()
+                    alive.robot_name = alive_bot
+                    alive.linear_vel = 0
+                    alive.angular_vel = 0
+
+                    # Publish alive message
+                    self._alive_pub.publish(alive)
+
 
             # Tell prey to die
         else:
@@ -131,9 +142,6 @@ class Master():
                 
                 if bot in self.dead:
                     alive_bots = len(self.alive.keys())
-
-                    first = random.randint(0, alive_bots)
-                    second = random.randint(0, alive_bots)
 
                     # Ensure two random parent bots
                     first_parent = random.choice(list(self.alive.keys()))
@@ -172,6 +180,7 @@ class Master():
                     alive.angular_vel = self.alive[bot][1]
 
                     self._alive_pub.publish(alive)
+
             rospy.sleep(4)
             # Tell predators to start hunting again
             hunt = Hunt_msg()

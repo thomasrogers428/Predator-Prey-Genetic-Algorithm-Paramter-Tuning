@@ -64,6 +64,9 @@ class Predator():
         self._new_gen_sub = rospy.Subscriber(DEFAULT_NEW_GENERATION_TOPIC, New_gen_msg, self._new_gen_callback, queue_size=1)
         self._hunt_sub = rospy.Subscriber(DEFAULT_HUNT_TOPIC, Hunt_msg, self._hunt_callback, queue_size=1)
 
+        # Subscribe to it's own publisher for case where there are multiple predators hunting
+        self._kill_sub = rospy.Subscriber(CUSTOM_KILL_TOPIC, Kill_msg, self._kill_callback, queue_size=10)
+
         # vel values
         self.linear_velocity = 2 # m/s
         self.angular_velocity = math.pi/4 # rad/s
@@ -86,6 +89,15 @@ class Predator():
     # Prey robot's odometry callback
     def location_callback(self, msg, args):
         self.preys[args] = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+
+    # A function to add all killed robots to each predators dead list
+    def _kill_callback(self, msg):
+        # Update lists
+        killed_bot = msg.robot_name
+        if killed_bot in self.alives:
+            print(self.namespace, "removing ", killed_bot, " from alives list")
+            self.alives.remove(killed_bot)
+
 
     # Callback function to set whether predator should be hunting or not
     def _hunt_callback(self, msg):
@@ -139,7 +151,7 @@ class Predator():
                 continue
             
             target = self.find_target_prey()
-
+            
             if not target:
                 continue
 
@@ -161,7 +173,7 @@ class Predator():
                 rospy.sleep(1)
 
             # Move towards target
-            else:
+            elif self.hunting:
                 tan_angle = math.atan2(target_y - self.y, target_x - self.x)
                 angle = tan_angle - self.theta
 
@@ -176,8 +188,8 @@ class Predator():
     def kill_prey(self, target):
         kill_msg = Kill_msg()
         kill_msg.robot_name = target
-        self._kill_pub.publish(kill_msg)
         self.alives.remove(kill_msg.robot_name)
+        self._kill_pub.publish(kill_msg)
 
 
     def _new_gen_callback(self, msg):
@@ -198,10 +210,6 @@ class Predator():
         rospy.sleep(2)
         self.move_forward(dist)
         self.rotate_in_place((2*math.pi)-self.theta)
-        
-        # Set linear and angular velocity to zero
-        self.linear_velocity = 0
-        self.angular_velocity = 0
 
         # Tell Master it's ready
         ready_msg = Ready_msg()
