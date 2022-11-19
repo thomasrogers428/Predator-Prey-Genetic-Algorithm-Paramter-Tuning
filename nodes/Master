@@ -270,8 +270,8 @@ class Master():
 
             avg_linear, avg_angular = self.new_gen()
 
-            s.write(self.generation_count+1, 2, avg_linear)
-            s.write(self.generation_count+1, 3, avg_angular)
+            s.write(self.generation_count, 2, avg_linear)
+            s.write(self.generation_count, 3, avg_angular)
 
             print("spawning new generation")
             self.data_wb.save("/root/catkin_ws/src/ppgapt/nodes/PPGAPT_DATA.xls")
