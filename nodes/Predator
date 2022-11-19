@@ -5,6 +5,7 @@ import math
 # import of relevant libraries.
 import rospy # module for ROS APIs
 import tf
+import copy
 
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
@@ -128,9 +129,12 @@ class Predator():
 
         min_dist = MAX_DIST
         target = None
-        for prey in self.alives:
 
-            if prey not in self.preys or self.preys[prey][0] == None:
+        curr_alive = copy.deepcopy(self.alives)
+        for prey in curr_alive:
+        # for prey in self.alives:
+
+            if prey not in self.preys or self.preys[prey][0] == None or prey not in self.alives:
                 continue
 
             dist_to_prey = math.sqrt((self.x - self.preys[prey][0])**2 + (self.y - self.preys[prey][1])**2)

@@ -7,6 +7,10 @@ import time
 import rospy # module for ROS APIs
 import tf
 import random
+from xlrd import open_workbook
+from xlutils.copy import copy
+import os
+
 
 # import msg/action/srv
 from geometry_msgs.msg import Twist # message type for cmd_vel
@@ -28,16 +32,15 @@ MIN_THRESHOLD_DISTANCE = 0.5 # m, threshold distance.
 NUM_PREY_BOTS = rospy.get_param("/num_prey") # Number of prey bots
 NUM_PREDATOR_BOTS = rospy.get_param("/num_predators") # Number of predator bots
 KILLED_THRESHOLD = rospy.get_param("/killed_threshold") # Once this many bots are killed, a new generation is spawned
-NUM_GENERATIONS_THRESHOLD = 4 # Once this many generations are spawned, the robots all stop
+NUM_GENERATIONS_THRESHOLD = 20 # Once this many generations are spawned, the robots all stop
 
 MIN_LINEAR_VEL = 0.05 # m/s
 MAX_LINEAR_VEL = 2.00 # m/s
 MIN_ANGULAR_VEL = math.pi/8 # rad/s
 MAX_ANGULAR_VEL = math.pi # rad/s
 
-
 class Master():
-    def __init__(self):
+    def __init__(self, data_wb):
 
         # Variables
         self.num_prey_bots = NUM_PREY_BOTS
@@ -64,6 +67,8 @@ class Master():
         self._registration_sub = rospy.Subscriber("/registration", Registration_msg, self.registration_callback)
         self._ready_sub = rospy.Subscriber("/ready", Ready_msg, self.ready_callback)
         self._kill_sub = rospy.Subscriber("/kill", Kill_msg, self.kill_callback, queue_size=10)
+
+        self.data_wb = data_wb
 
 
     # A function to spawn the first generation of predator and prey robots
@@ -152,10 +157,18 @@ class Master():
                     new_angular = (self.alive[first_parent][1] + self.alive[second_parent][1]) / 2
 
                     # Mutation opportunity
-                    if random.randint(0, 1) == 1:
-                        print("Mutating")
-                        new_linear += 0.15
+                    mutation_val = random.randint(1, 10)
+                    if mutation_val <= 3:
+                        print("Negative Mutation")
+                        new_linear -= 0.15
+                        new_angular += 0.15
                         print("new velocity is", new_linear)
+                    elif mutation_val >= 8:
+                        print("Negative Mutation")
+                        new_linear += 0.15
+                        new_angular -= 0.15
+                        print("new velocity is", new_linear)
+                    
 
                     # Construct alive message
                     alive = Alive_msg()
@@ -181,6 +194,16 @@ class Master():
 
                     self._alive_pub.publish(alive)
 
+            avg_linear, avg_angular = 0, 0
+            for bot in self.prey:
+                linear, angular = self.alive[bot]
+                avg_linear += linear
+                avg_angular += angular
+
+            avg_angular /= len(self.prey)
+            avg_linear /= len(self.prey)
+
+
             rospy.sleep(4)
             # Tell predators to start hunting again
             hunt = Hunt_msg()
@@ -190,8 +213,7 @@ class Master():
             # Reset starting val
             self.last_time = time.time()
 
-
-    
+            return avg_linear, avg_angular
 
     # A function to randomly generate linked velocity traits 
     def genetic_velocities(self):
@@ -222,16 +244,18 @@ class Master():
     def kill_callback(self, msg):
         # Update lists
         killed_bot = msg.robot_name
+        print("Self.alive", self.alive, killed_bot)
         if killed_bot in self.alive:
             del self.alive[killed_bot]
             self.dead.append(killed_bot)
             self.num_killed += 1
-            print("Kill occured")
+            print(self.num_killed, self.alive)
+            print("Kill occured", killed_bot)
 
         rospy.sleep(5)
         # If threshold met, start new generation
-        if self.num_killed == self.num_killed_threshold:
-
+        if self.num_killed >= self.num_killed_threshold:
+            self.num_killed = 0
             # Tell predators to stop hunting
             hunt = Hunt_msg()
             hunt.hunt = False
@@ -239,9 +263,20 @@ class Master():
 
             # Grab generation time
             print("Generation " + str(self.generation_count) + ": " + str(time.time() - self.last_time))
+            s = self.data_wb.get_sheet(0)
+            s.write(self.generation_count+1, 0, self.generation_count)
+            s.write(self.generation_count+1, 1, str(time.time() - self.last_time))
+
+
+            avg_linear, avg_angular = self.new_gen()
+
+            s.write(self.generation_count+1, 2, avg_linear)
+            s.write(self.generation_count+1, 3, avg_angular)
+
             print("spawning new generation")
-            self.new_gen()
-            self.num_killed = 0
+            self.data_wb.save("/root/catkin_ws/src/ppgapt/nodes/PPGAPT_DATA.xls")
+
+            
 
     # Callback function to ensure every robot has moved to its waypoint before next round
     def ready_callback(self, msg):
@@ -264,9 +299,11 @@ def main():
 
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
+    rb = open_workbook("/root/catkin_ws/src/ppgapt/nodes/PPGAPT_DATA.xls")
+    wb = copy(rb)
 
     # Initialization of the class
-    master = Master()
+    master = Master(wb)
 
     # Sleep for a few seconds to wait for the registration.
     rospy.sleep(2)
@@ -288,6 +325,8 @@ def main():
 if __name__ == "__main__":
     """Run the main function."""
     main()
+
+
 
 
         
